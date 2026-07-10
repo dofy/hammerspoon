@@ -1,5 +1,5 @@
 -- Mouse Follow Module
--- 功能：当窗口获得焦点时，自动将鼠标移动到该窗口所在屏幕的中心
+-- Warps the cursor to the center of a window's screen when that window gains focus.
 local M = {}
 
 -- Configuration
@@ -22,33 +22,33 @@ end
 
 local function maybeWarpMouseTo(win)
     if not M.config.enabled then return end
+
+    -- Skip if this focus change was triggered by a recent mouse click
+    local timeSinceClick = hs.timer.secondsSinceEpoch() - lastClickTime
+    if timeSinceClick < M.config.clickDetectWindow then return end
+
     if win == nil or not win:isStandard() then return end
 
     local scr = win:screen()
     if scr == nil then return end
 
-    local targetPos = centerOfScreen(scr)
-    if targetPos == nil then return end
-
-    -- Check if activation was caused by a recent mouse click
-    local timeSinceClick = hs.timer.secondsSinceEpoch() - lastClickTime
-    if timeSinceClick < M.config.clickDetectWindow then return end
-
+    -- If the mouse is already on the target screen, don't move it
     local mouseScr = hs.mouse.getCurrentScreen()
+    if mouseScr and mouseScr:id() == scr:id() then return end
 
-    -- If mouse is already on the target screen, don't move
-    if mouseScr and scr and mouseScr:id() == scr:id() then return end
-
-    -- Mouse is on a different screen, move it to target screen center
-    hs.mouse.absolutePosition(targetPos)
+    -- Mouse is on a different screen: move it to the target screen center
+    local targetPos = centerOfScreen(scr)
+    if targetPos then hs.mouse.absolutePosition(targetPos) end
 end
 
 function M.start()
     if wf then M.stop() end
 
-    -- Track mouse clicks to avoid moving when clicking activates window
-    clickEventTap = hs.eventtap.new({hs.eventtap.event.types.leftMouseDown},
-                                    function(event)
+    -- Track mouse clicks to avoid moving when a click activates a window
+    clickEventTap = hs.eventtap.new({
+        hs.eventtap.event.types.leftMouseDown,
+        hs.eventtap.event.types.rightMouseDown
+    }, function(event)
         lastClickTime = hs.timer.secondsSinceEpoch()
         return false -- don't block the event
     end)
@@ -95,4 +95,3 @@ function M.toggle()
 end
 
 return M
-
