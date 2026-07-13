@@ -19,7 +19,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
    ```
 
 3. Launch Hammerspoon and grant Accessibility permissions when prompted.
-4. Reload the config (menu-bar icon → *Reload Config*, or `⌘ + ⌥ + ⌃ + R`).
+4. Reload the config (menu-bar icon → _Reload Config_, or `⌘ + ⌥ + ⌃ + R`).
 
 ## Layout
 
