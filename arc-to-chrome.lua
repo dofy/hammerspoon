@@ -25,7 +25,7 @@ M.config = {
     -- Arc 偶尔漏接快捷键:剪贴板仍未写入时的重发间隔
     resendInterval = 0.35,
     -- 打印执行过程到 Hammerspoon Console
-    debug = true,
+    debug = false,
 }
 
 local logFile = os.getenv("HOME") .. "/.hammerspoon/arc-to-chrome.log"
