@@ -19,7 +19,7 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 **Module convention:** each `.lua` module returns a table `M` exposing a `M.config` table plus lifecycle functions `M.start()` / `M.stop()` / `M.toggle()`. `start()` must be idempotent (call `stop()` first if already running) and store event taps / window filters in module-private locals so `stop()` can tear them down. Follow this shape when adding modules.
 
 - `mouse-follow.lua` — warps the cursor to the center of a window's screen on focus. Uses an `hs.window.filter` for focus/creation events and an `hs.eventtap` on `leftMouseDown` to suppress warping right after a click (so clicking to focus doesn't move the mouse).
-- `arc-to-chrome.lua` — when Arc is the active app, `Cmd+Ctrl+C` opens the current tab URL in Chrome. Loaded and started in `init.lua`.
+- `dia-to-chrome.lua` — when Dia is the active app, `Cmd+Ctrl+C` opens the current tab URL in Chrome. Loaded and started in `init.lua`.
 - `test.lua` — battery-info diagnostic (`hs.battery.*`); not loaded by `init.lua`, invoke manually.
 - `ui-demo.lua` — UI demo scratch file; not loaded by `init.lua`.
 

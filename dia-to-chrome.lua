@@ -1,9 +1,9 @@
--- arc-to-chrome.lua
--- 当 Arc 处于激活状态时,按 Cmd+Ctrl+C 用 Chrome 打开 Arc 当前激活 tab 的 URL
--- 兼容 Little Arc(独立浮窗):统一使用 Arc 自带“复制 URL 快捷键 + 读剪贴板”。
+-- dia-to-chrome.lua
+-- 当 Dia 处于激活状态时,按 Cmd+Ctrl+C 用 Chrome 打开 Dia 当前激活 tab 的 URL
+-- 统一使用 Dia 自带“复制 URL 快捷键 + 读剪贴板”。
 --
 -- 关键点:触发热键 Cmd+Ctrl+C 时,用户仍物理按住 Cmd/Ctrl。若立刻合成
--- Cmd+Shift+C,物理按住的 Ctrl 会叠加成 Cmd+Ctrl+Shift+C,导致 Arc 复制失败。
+-- Cmd+Shift+C,物理按住的 Ctrl 会叠加成 Cmd+Ctrl+Shift+C,导致 Dia 复制失败。
 -- 因此先等待物理修饰键释放,再合成复制快捷键;复制后轮询剪贴板直到拿到 URL。
 
 local M = {}
@@ -11,10 +11,10 @@ local M = {}
 M.config = {
     mods = {"cmd", "ctrl"},
     key = "C",
-    -- Arc 中“复制当前页面 URL”的快捷键,默认 Cmd+Shift+C
+    -- Dia 中“复制当前页面 URL”的快捷键,默认 Cmd+Shift+C
     copyUrlMods = {"cmd", "shift"},
     copyUrlKey = "C",
-    -- keyStroke 按下与抬起的间隔(微秒),太小 Arc 可能识别不到快捷键
+    -- keyStroke 按下与抬起的间隔(微秒),太小 Dia 可能识别不到快捷键
     keyStrokeDelay = 40000,
     -- 等待物理修饰键释放
     modReleasePoll = 0.03,
@@ -22,13 +22,13 @@ M.config = {
     -- 复制后轮询剪贴板:间隔与最长等待
     pollInterval = 0.05,
     pollMax = 1.5, -- 最多等 1.5s
-    -- Arc 偶尔漏接快捷键:剪贴板仍未写入时的重发间隔
+    -- Dia 偶尔漏接快捷键:剪贴板仍未写入时的重发间隔
     resendInterval = 0.35,
     -- 打印执行过程到 Hammerspoon Console
     debug = false,
 }
 
-local logFile = os.getenv("HOME") .. "/.hammerspoon/arc-to-chrome.log"
+local logFile = os.getenv("HOME") .. "/.hammerspoon/dia-to-chrome.log"
 
 local function dbg(...)
     if not M.config.debug then return end
@@ -37,7 +37,7 @@ local function dbg(...)
         parts[i] = tostring(select(i, ...))
     end
     local line = os.date("%H:%M:%S") .. " " .. table.concat(parts, " ")
-    print("[arc2chrome]", line)
+    print("[dia2chrome]", line)
     local f = io.open(logFile, "a")
     if f then
         f:write(line, "\n")
@@ -64,7 +64,7 @@ end
 
 local function doCopyAndOpen()
     local saved = hs.pasteboard.getContents()
-    local sentinel = "__ARC2CHROME_SENTINEL__"
+    local sentinel = "__DIA2CHROME_SENTINEL__"
     hs.pasteboard.setContents(sentinel)
 
     local function sendCopy()
@@ -73,8 +73,8 @@ local function doCopyAndOpen()
     end
     sendCopy()
 
-    -- 轮询剪贴板:一旦被 Arc 写入合法 URL 就立即打开,兼顾速度与可靠性
-    -- Arc 偶尔完全没接住快捷键(剪贴板停在 sentinel),因此在超时前定期重发
+    -- 轮询剪贴板:一旦被 Dia 写入合法 URL 就立即打开,兼顾速度与可靠性
+    -- Dia 偶尔完全没接住快捷键(剪贴板停在 sentinel),因此在超时前定期重发
     local waited = 0
     local lastSend = 0
     local timer
@@ -90,7 +90,7 @@ local function doCopyAndOpen()
         elseif waited >= M.config.pollMax then
             timer:stop()
             dbg("timeout, no URL after", string.format("%.2fs", waited))
-            hs.alert.show("无法获取 Arc 当前 tab 的 URL")
+            hs.alert.show("无法获取 Dia 当前 tab 的 URL")
             if saved ~= nil then hs.pasteboard.setContents(saved) end
         elseif url == sentinel and (waited - lastSend) >= M.config.resendInterval then
             -- 仍未写入,快捷键可能被漏接,重发
@@ -124,8 +124,8 @@ function M.start()
 
     appWatcher = hs.application.watcher.new(function(appName, eventType, app)
         if eventType == hs.application.watcher.activated then
-            if appName == "Arc" then
-                dbg("Arc activated -> hotkey enabled")
+            if appName == "Dia" then
+                dbg("Dia activated -> hotkey enabled")
                 hotkey:enable()
             else
                 hotkey:disable()
@@ -135,7 +135,7 @@ function M.start()
     appWatcher:start()
 
     local front = hs.application.frontmostApplication()
-    if front and front:name() == "Arc" then
+    if front and front:name() == "Dia" then
         hotkey:enable()
     end
 end

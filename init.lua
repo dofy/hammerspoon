@@ -12,9 +12,9 @@ mouseFollow.config.clickDetectWindow = 0.3
 -- Start modules
 mouseFollow.start()
 
--- Arc -> Chrome: 仅当 Arc 激活时,Cmd+Ctrl+C 用 Chrome 打开当前 tab URL
-local arcToChrome = require("arc-to-chrome")
-arcToChrome.start()
+-- Dia -> Chrome: 仅当 Dia 激活时,Cmd+Ctrl+C 用 Chrome 打开当前 tab URL
+local diaToChrome = require("dia-to-chrome")
+diaToChrome.start()
 
 -- Show success message
 hs.alert.show("🎉 Hammerspoon 🎉", 2)
