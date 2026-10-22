@@ -85,6 +85,14 @@ histogram and a trend chart, each switchable between bars and a line; and a coll
 combination × app detail table. Everything re-pivots client-side from the app and modifier
 selectors.
 
+**生成分享图** rasterises the page itself into a PNG — preview, download, or copy to the
+clipboard. It needs no library and works from `file://`: the page is cloned into an
+`<svg><foreignObject>` together with its own stylesheet and drawn onto a canvas at 2×, which
+stays untainted only because the page loads no external image or font. The resolved theme is
+stamped onto the clone, since media queries inside the rasterised SVG cannot see the page's.
+Interactive chrome carrying `data-noexport` — the share button itself, the pause button — is
+stripped first, and the detail table is captured in whatever state it is on screen.
+
 Window titles were collected until 2026-10-22 and then dropped: in the apps that carry the most
 shortcuts the title was a constant (`微信`, `飞书`) and added nothing to the app name, while the
 apps with many titles — a browser, a chat client — contributed a fresh row per page, 45% of them

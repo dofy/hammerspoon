@@ -44,7 +44,8 @@ body {
   font: 14px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
 }
 .wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-3); }
-header { margin-bottom: var(--sp-1); }
+header { margin-bottom: var(--sp-1); display: flex; align-items: flex-start; gap: var(--sp-3); }
+header > div { flex: 1; min-width: 0; }
 h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: 0; }
 .sub { color: var(--muted); font-size: 13px; }
 
@@ -170,6 +171,28 @@ details.panel > summary::before { content: "▸"; color: var(--faint); }
 details.panel[open] > summary::before { content: "▾"; }
 
 .empty { color: var(--faint); padding: var(--sp-4) 0; text-align: center; }
+.sheet {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 10, 14, .62); padding: var(--sp-3); backdrop-filter: blur(2px);
+}
+.sheet-box {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  max-width: min(960px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden;
+}
+.sheet-head {
+  display: flex; gap: var(--sp-3); align-items: center; justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--line);
+  font-size: 12px; color: var(--muted);
+}
+.sheet-actions { display: flex; gap: var(--sp-1); align-items: center; }
+.btnlike {
+  font: inherit; color: var(--ink); background: var(--bg); text-decoration: none;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer;
+}
+.btnlike:hover { border-color: var(--chev); }
+.sheet-body { overflow: auto; padding: var(--sp-3); }
+.sheet-body img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+
 footer { color: var(--faint); font-size: 12px; display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--s3); display: inline-block; }
 .dot.off { background: var(--s9); }
@@ -181,8 +204,11 @@ footer code { color: var(--muted); }
 <body>
 <div class="wrap">
   <header>
-    <h1>Keystats</h1>
-    <div class="sub" id="sub"></div>
+    <div>
+      <h1>Keystats</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <button id="share" data-noexport>生成分享图</button>
   </header>
 
   <div class="panel controls">
@@ -244,6 +270,20 @@ footer code { color: var(--muted); }
   </details>
 
   <footer id="foot"></footer>
+</div>
+
+<div class="sheet" id="shareSheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-head">
+      <span id="shareInfo">正在生成…</span>
+      <span class="sheet-actions">
+        <a id="shareDownload" class="btnlike" download hidden>下载 PNG</a>
+        <button id="shareCopy" hidden>复制到剪贴板</button>
+        <button id="shareClose">关闭</button>
+      </span>
+    </div>
+    <div class="sheet-body"><img id="shareImg" alt="统计页面快照"></div>
+  </div>
 </div>
 
 <script>
@@ -585,7 +625,7 @@ function renderAll() {
     ? `<span class="dot${state.paused ? " off" : ""}"></span>
        <span>${state.paused ? "已暂停" : `每 ${POLL_MS / 1000}s 自动刷新`} · 更新于 ${
          new Date().toLocaleTimeString()}</span>
-       <button id="pause">${state.paused ? "继续" : "暂停"}</button>`
+       <button id="pause" data-noexport>${state.paused ? "继续" : "暂停"}</button>`
     : `<span>静态快照 · 数据来源 <code>~/.local/share/keystats/keystats.db</code> ·
        实时看板：<code>keystats serve --open</code></span>`;
   if (API) el("pause").onclick = () => { state.paused = !state.paused; renderAll(); };
@@ -610,6 +650,110 @@ async function load(force) {
   } catch (err) {
     el("foot").innerHTML = `<span class="dot off"></span><span>读取失败：${esc(err.message)}</span>`;
   }
+}
+
+// Rasterising the page itself, rather than redrawing a summary, keeps the
+// shared image honest about what was on screen. An <svg><foreignObject> holding
+// a clone plus this page's own stylesheet needs no library and works from
+// file:// too; it only stays untainted because the page loads no external
+// image or font.
+async function renderShareImage(scale = 2) {
+  const wrap = document.querySelector(".wrap");
+  const width = Math.ceil(wrap.getBoundingClientRect().width);
+  const height = Math.ceil(wrap.scrollHeight);
+
+  const clone = wrap.cloneNode(true);
+  clone.querySelectorAll("[data-noexport]").forEach(n => n.remove());
+  // Media queries inside the rasterised SVG do not see the page's resolved
+  // theme, so stamp it; the stylesheet honours data-theme in both directions.
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches
+    && document.documentElement.dataset.theme !== "light";
+  clone.setAttribute("data-theme", dark ? "dark" : "light");
+  clone.style.background = getComputedStyle(document.body).backgroundColor;
+  clone.style.padding = "24px";
+  clone.style.boxSizing = "content-box";
+
+  const css = [...document.querySelectorAll("style")].map(n => n.textContent).join("\n");
+  const body = new XMLSerializer().serializeToString(clone);
+  const pad = 48;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width + pad}" height="${height + pad}">`
+    + `<foreignObject width="100%" height="100%">`
+    + `<div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style>${body}</div>`
+    + `</foreignObject></svg>`;
+
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = () => reject(new Error("快照渲染失败"));
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = (width + pad) * scale;
+  canvas.height = (height + pad) * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, 0, 0);
+
+  const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
+  return { blob, width: canvas.width, height: canvas.height };
+}
+
+function initShare() {
+  const sheet = el("shareSheet"), btn = el("share");
+  let url = null;
+
+  const close = () => {
+    sheet.hidden = true;
+    if (url) { URL.revokeObjectURL(url); url = null; }
+  };
+  el("shareClose").onclick = close;
+  sheet.onclick = e => { if (e.target === sheet) close(); };
+  addEventListener("keydown", e => { if (e.key === "Escape" && !sheet.hidden) close(); });
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = "生成中…";
+    el("shareImg").removeAttribute("src");
+    el("shareDownload").hidden = true;
+    el("shareCopy").hidden = true;
+    el("shareInfo").textContent = "正在生成…";
+    sheet.hidden = false;
+    try {
+      const { blob, width, height } = await renderShareImage();
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(blob);
+      el("shareImg").src = url;
+      const d = new Date(), z = n => String(n).padStart(2, "0");   // local time, not UTC
+      const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}`
+        + `-${z(d.getHours())}${z(d.getMinutes())}`;
+      const dl = el("shareDownload");
+      dl.href = url;
+      dl.download = `keystats-${DATA.meta.since}-${stamp}.png`;
+      dl.hidden = false;
+      el("shareInfo").textContent = `${width}×${height} · ${Math.round(blob.size / 1024)} KB`
+        + (el("detailPanel").open ? " · 含明细" : " · 明细已折叠");
+      if (navigator.clipboard && window.ClipboardItem) {
+        const copy = el("shareCopy");
+        copy.hidden = false;
+        copy.textContent = "复制到剪贴板";
+        copy.onclick = async () => {
+          try {
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+            copy.textContent = "已复制";
+          } catch (err) {
+            copy.textContent = "复制失败";
+          }
+        };
+      }
+    } catch (err) {
+      el("shareInfo").textContent = `生成失败：${err.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  };
 }
 
 function init() {
@@ -637,6 +781,8 @@ function init() {
     refreshSelects();
     render();
   };
+
+  initShare();
 
   if (API) {
     load(true);
