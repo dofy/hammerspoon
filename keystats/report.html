@@ -76,7 +76,10 @@ select, button {
   padding: 7px 12px; height: 34px;
 }
 select { appearance: none; -webkit-appearance: none; width: 100%; padding-right: 34px; text-overflow: ellipsis; }
-#fApp { min-width: 230px; } #fMods { min-width: 170px; }
+#fApp   { min-width: 180px; max-width: 220px; }
+#fTitle { min-width: 180px; max-width: 240px; }
+#fMods  { min-width: 140px; max-width: 170px; }
+#fSince { min-width: 110px; max-width: 130px; }
 button { cursor: pointer; padding: 7px 14px; }
 button:hover { border-color: var(--chev); }
 button:disabled { opacity: .45; cursor: not-allowed; }
@@ -91,6 +94,7 @@ button.on { background: var(--accent-soft); border-color: var(--accent); }
 .kpi .k { color: var(--muted); font-size: 12px; margin-top: 2px; }
 
 .cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--sp-3); align-items: start; }
+.stack { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
 @media (max-width: 880px) { .cols { grid-template-columns: 1fr; } }
 
 .kb { display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
@@ -185,25 +189,29 @@ footer code { color: var(--muted); }
     <div class="kb" id="kb"></div>
   </div>
 
+  <!-- Two independent column stacks rather than two grid rows, so a short card
+       packs up against the one above it instead of waiting for the tall card
+       beside it to finish. -->
   <div class="cols">
-    <div class="panel">
-      <h2>Top 组合键</h2>
-      <div id="topCombos"></div>
+    <div class="stack">
+      <div class="panel">
+        <h2>Top 组合键</h2>
+        <div id="topCombos"></div>
+      </div>
+      <div class="panel">
+        <h2>时段分布 <span class="scope">本地时间 0–23 时</span><span class="seg sm" id="hodSeg"></span></h2>
+        <div id="hod"></div>
+      </div>
     </div>
-    <div class="panel">
-      <h2>App 分布 <span class="seg sm" id="appSeg"></span></h2>
-      <div id="appDist"></div>
-    </div>
-  </div>
-
-  <div class="cols">
-    <div class="panel">
-      <h2>时段分布 <span class="scope">本地时间 0–23 时</span><span class="seg sm" id="hodSeg"></span></h2>
-      <div id="hod"></div>
-    </div>
-    <div class="panel">
-      <h2>修饰键分布 <span class="seg sm" id="modSeg"></span></h2>
-      <div id="modDist"></div>
+    <div class="stack">
+      <div class="panel">
+        <h2>App 分布 <span class="seg sm" id="appSeg"></span></h2>
+        <div id="appDist"></div>
+      </div>
+      <div class="panel">
+        <h2>修饰键分布 <span class="seg sm" id="modSeg"></span></h2>
+        <div id="modDist"></div>
+      </div>
     </div>
   </div>
 
@@ -598,6 +606,8 @@ function refreshSelects() {
   fillSelect(el("fTitle"), [...new Set(titleRows.map(r => r.title))], "全部标题", state.title);
   keep(el("fApp"), state.app); keep(el("fMods"), state.mods); keep(el("fTitle"), state.title);
   state.app = el("fApp").value; state.mods = el("fMods").value; state.title = el("fTitle").value;
+  el("fApp").title = state.app || "全部 app";
+  el("fTitle").title = state.title || "全部标题";
 }
 
 function renderAll() {
@@ -668,7 +678,11 @@ function init() {
   }
 
   el("fApp").onchange   = e => { state.app = e.target.value; refreshSelects(); render(); };
-  el("fTitle").onchange = e => { state.title = e.target.value; render(); };
+  el("fTitle").onchange = e => {
+    state.title = e.target.value;
+    e.target.title = state.title || "全部标题";   // the closed select is ellipsised
+    render();
+  };
   el("fMods").onchange  = e => { state.mods = e.target.value; render(); };
   el("reset").onclick = () => {
     state.app = state.mods = state.title = "";
