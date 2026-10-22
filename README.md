@@ -104,7 +104,11 @@ is in front is therefore filed under Cursor. Two signals narrow it down, and `ke
 A keystroke is recorded only when it carries ⌘, ⌥ or ⌃. Shift alone is capitalisation, so it
 counts only as a co-modifier, and a bare arrow key, Escape or function key is navigation rather
 than a shortcut (`config.includeBareSpecialKeys` turns those back on). Plain character keys are
-never recorded unless `config.includePlainKeys` is set, so the database holds no typed text. Modifier order is normalised to `ctrl+alt+shift+cmd`, and the `fn` flag is dropped,
+never recorded unless `config.includePlainKeys` is set, so the database holds no typed text.
+
+Real hotkeys that live on Shift alone are named individually in `config.alwaysRecord`, which
+ships with Raycast's `shift+space`. Write the key the way this module spells it: modifiers in
+`ctrl+alt+shift+cmd` order, then the `hs.keycodes.map` name, joined with `+`. Modifier order is normalised to `ctrl+alt+shift+cmd`, and the `fn` flag is dropped,
 because macOS sets it on every arrow and function key. Keys are stored as keycodes, so switching
 input source cannot split one physical key across two rows. Key repeats from holding a key down
 are skipped by default. Nothing is recorded while macOS secure input is active (password fields,
