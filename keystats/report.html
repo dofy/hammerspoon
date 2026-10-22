@@ -58,6 +58,8 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: 0; }
 }
 .panel > h2 .scope { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; }
 .panel > h2 .seg { margin-left: auto; }
+/* a second segmented control in the same heading reads as its own group */
+.panel > h2 .seg + .seg { margin-left: var(--sp-3); }
 
 .controls { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-3); }
 .ctrl { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
@@ -172,7 +174,6 @@ footer code { color: var(--muted); }
     <div class="ctrl" id="titleCtrl" hidden><span class="ctrl-k">窗口标题</span>
       <span class="sel"><select id="fTitle"></select></span></div>
     <div class="ctrl"><span class="ctrl-k">修饰键</span><span class="sel"><select id="fMods"></select></span></div>
-    <div class="ctrl"><span class="ctrl-k">时间粒度</span><span class="seg" id="bucketSeg"></span></div>
     <div class="ctrl"><span class="ctrl-k">统计维度</span><span class="seg" id="dimSeg"></span></div>
     <div class="ctrl"><span class="ctrl-k" aria-hidden="true">&nbsp;</span><button id="reset">重置</button></div>
   </div>
@@ -222,7 +223,8 @@ footer code { color: var(--muted); }
   </div>
 
   <div class="panel">
-    <h2>趋势 <span class="scope" id="trendScope"></span><span class="seg sm" id="trendSeg"></span></h2>
+    <h2>趋势 <span class="scope" id="trendScope"></span>
+      <span class="seg sm" id="bucketSeg"></span><span class="seg sm" id="trendSeg"></span></h2>
     <div id="trend"></div>
   </div>
 
@@ -250,6 +252,8 @@ const KEYSYM = {
   home: "↖", end: "↘", pageup: "⇞", pagedown: "⇟", help: "?"
 };
 const BUCKET_CN = { hour: "小时", day: "天", week: "周", month: "月" };
+const BUCKET_SECONDS = { hour: 3600, day: 86400, week: 604800, month: 2592000 };
+const BUCKET_AVG = { hour: "小时均", day: "日均", week: "周均", month: "月均" };
 const SERIES_MAX = 8;
 
 const prettyMods = m => m ? m.split("+").map(x => SYM[x] || x).join("") : "";
@@ -439,11 +443,12 @@ function render() {
   const total = rows.reduce((s, r) => s + r.n, 0);
   const combos = new Set(rows.map(r => (r.mods || "") + "/" + r.key)).size;
   const apps = new Set(rows.map(r => r.app)).size;
-  const days = Math.max(1, Math.round((DATA.meta.ts_to - DATA.meta.ts_from) / 86400));
+  const periods = Math.max(1, Math.round(
+    (DATA.meta.ts_to - DATA.meta.ts_from) / BUCKET_SECONDS[state.bucket]));
 
   el("kpis").innerHTML = [
     [fmt(total), "带修饰键按键"], [fmt(combos), "独立组合键"],
-    [fmt(apps), "涉及 app"], [fmt(Math.round(total / days)), "日均"],
+    [fmt(apps), "涉及 app"], [fmt(Math.round(total / periods)), BUCKET_AVG[state.bucket]],
   ].map(([v, k]) => `<div class="kpi"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
 
   drawKeyboard(rows);
