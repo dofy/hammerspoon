@@ -20,6 +20,15 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 
 - `mouse-follow.lua` — warps the cursor to the center of a window's screen on focus. Uses an `hs.window.filter` for focus/creation events and an `hs.eventtap` on `leftMouseDown` to suppress warping right after a click (so clicking to focus doesn't move the mouse).
 - `dia-to-chrome.lua` — when Dia is the active app, `Cmd+Ctrl+C` opens the current tab URL in Chrome. Loaded and started in `init.lua`.
+- `keystats.lua` — shortcut-usage collector. An `hs.eventtap` on `keyDown` keeps only
+  modifier-bearing keys plus Escape / F-keys / navigation keys, buffers them in memory and
+  flushes to SQLite (`hs.sqlite3`) every 5s. The callback makes **no** OS calls: the frontmost
+  app comes from an `hs.application.watcher` and the window title from an `hs.window.filter`
+  subscription, because fetching an AX title in the hot path adds typing latency. A watchdog
+  timer restarts the tap, since macOS silently disables a tap it considers slow. Modifier
+  strings are normalised to `ctrl+alt+shift+cmd` order and the `fn` flag is dropped (macOS sets
+  it on every arrow and function key). Query the database with `keystats/keystats`, a zsh CLI
+  over `/usr/bin/sqlite3` that also renders `keystats/report.html` into a local dashboard.
 - `test.lua` — battery-info diagnostic (`hs.battery.*`); not loaded by `init.lua`, invoke manually.
 - `ui-demo.lua` — UI demo scratch file; not loaded by `init.lua`.
 

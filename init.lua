@@ -16,6 +16,13 @@ mouseFollow.start()
 local diaToChrome = require("dia-to-chrome")
 diaToChrome.start()
 
+-- Keystats: 记录带修饰键的按键，供 `keystats` CLI 统计快捷键使用情况
+local keystats = require("keystats")
+keystats.start()
+
+-- hs.ipc: 允许 `hs -c "..."` 从终端查询运行中的配置
+require("hs.ipc")
+
 -- Show success message
 hs.alert.show("🎉 Hammerspoon 🎉", 2)
 

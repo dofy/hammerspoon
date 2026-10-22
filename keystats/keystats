@@ -1,0 +1,286 @@
+#!/bin/zsh
+# keystats — query the shortcut-usage database written by ~/.hammerspoon/keystats.lua
+emulate -L zsh
+set -euo pipefail
+
+DB=${KEYSTATS_DB:-$HOME/.local/share/keystats/keystats.db}
+SELF_DIR=${0:A:h}
+TEMPLATE=${KEYSTATS_TEMPLATE:-$SELF_DIR/report.html}
+SQLITE=/usr/bin/sqlite3
+
+die() { print -u2 "keystats: $*"; exit 1 }
+[[ -f $DB ]] || die "no database at $DB (is the Hammerspoon module running?)"
+
+# --- time parsing -----------------------------------------------------------
+# Accepts: all | today | yesterday | 7d | 24h | 90m | 4w | YYYY-MM-DD
+epoch_of() {
+  local v=$1
+  case $v in
+    ''|all)     print 0 ;;
+    today)      date -v0H -v0M -v0S +%s ;;
+    yesterday)  date -v-1d -v0H -v0M -v0S +%s ;;
+    now)        date +%s ;;
+    <->d)       date -v-${v%d}d +%s ;;
+    <->w)       date -v-${v%w}w +%s ;;
+    <->h)       date -v-${v%h}H +%s ;;
+    <->m)       date -v-${v%m}M +%s ;;
+    <->mo)      date -v-${v%mo}m +%s ;;
+    ????-??-??) date -j -f '%Y-%m-%d %H:%M:%S' "$v 00:00:00" +%s ;;
+    *)          die "cannot parse time '$v'" ;;
+  esac
+}
+
+# --- dimension expressions --------------------------------------------------
+MODSYM="replace(replace(replace(replace(replace(e.mods,'ctrl','⌃'),'alt','⌥'),'shift','⇧'),'cmd','⌘'),'+','')"
+KEYLBL="CASE WHEN length(k.name)=1 THEN upper(k.name) ELSE k.name END"
+LOCAL="'unixepoch','localtime'"
+
+dim_expr() {
+  case $1 in
+    combo)     print "$MODSYM || $KEYLBL" ;;
+    key)       print "$KEYLBL" ;;
+    mods)      print "CASE WHEN e.mods='' THEN '(none)' ELSE $MODSYM END" ;;
+    app)       print "a.name" ;;
+    bundle)    print "a.bundle_id" ;;
+    title)     print "coalesce(t.norm,'(no title)')" ;;
+    hour)      print "strftime('%Y-%m-%d %H:00', e.ts,$LOCAL)" ;;
+    day)       print "strftime('%Y-%m-%d', e.ts,$LOCAL)" ;;
+    week)      print "strftime('%Y-W%W', e.ts,$LOCAL)" ;;
+    month)     print "strftime('%Y-%m', e.ts,$LOCAL)" ;;
+    dow)       print "strftime('%w', e.ts,$LOCAL)" ;;
+    hourofday) print "strftime('%H', e.ts,$LOCAL)" ;;
+    *) die "unknown dimension '$1' (combo key mods app bundle title hour day week month dow hourofday)" ;;
+  esac
+}
+
+FROM="FROM event e
+      JOIN app a       ON a.id = e.app_id
+      LEFT JOIN title t ON t.id = e.title_id
+      LEFT JOIN keyname k ON k.keycode = e.keycode"
+
+# --- shared option parsing --------------------------------------------------
+sql_quote() { local v=${1-}; print -- "${v//\'/\'\'}" }
+
+parse_opts() {
+  SINCE=${KEYSTATS_SINCE:-7d}; UNTIL=now; APP=; TITLE=; MODS=; KEY=
+  BY=combo; ROWS=app; COLS=mods; BUCKET=day; LIMIT=20; OUT=; OPEN=0; FROMFILE=; OLDER=
+  while (( $# )); do
+    case $1 in
+      --since)  SINCE=$2; shift 2 ;;
+      --until)  UNTIL=$2; shift 2 ;;
+      --app)    APP=$2;   shift 2 ;;
+      --title)  TITLE=$2; shift 2 ;;
+      --mods)   MODS=$2;  shift 2 ;;
+      --key)    KEY=$2;   shift 2 ;;
+      --by)     BY=$2;    shift 2 ;;
+      --rows)   ROWS=$2;  shift 2 ;;
+      --cols)   COLS=$2;  shift 2 ;;
+      --bucket) BUCKET=$2; shift 2 ;;
+      --limit)  LIMIT=$2; shift 2 ;;
+      --out)    OUT=$2;   shift 2 ;;
+      --from)   FROMFILE=$2; shift 2 ;;
+      --older-than) OLDER=$2; shift 2 ;;
+      --open)   OPEN=1; shift ;;
+      -*) die "unknown option $1" ;;
+      *)  die "unexpected argument $1" ;;
+    esac
+  done
+  TS_FROM=$(epoch_of $SINCE); TS_TO=$(epoch_of $UNTIL)
+  WHERE="e.ts >= $TS_FROM AND e.ts <= $TS_TO"
+  if [[ -n $APP   ]]; then WHERE+=" AND (a.name LIKE '%$(sql_quote "$APP")%' OR a.bundle_id LIKE '%$(sql_quote "$APP")%')"; fi
+  if [[ -n $TITLE ]]; then WHERE+=" AND t.norm LIKE '%$(sql_quote "$TITLE")%'"; fi
+  if [[ -n $MODS  ]]; then WHERE+=" AND e.mods = '$(sql_quote "$MODS")'"; fi
+  if [[ -n $KEY   ]]; then WHERE+=" AND k.name = '$(sql_quote "$KEY")'"; fi
+  return 0
+}
+
+# --- commands ---------------------------------------------------------------
+cmd_status() {
+  $SQLITE -box "$DB" "
+    SELECT (SELECT count(*) FROM event)                                   AS event_rows,
+           (SELECT coalesce(sum(n),0) FROM event)                         AS keypresses,
+           (SELECT count(*) FROM app)                                     AS apps,
+           (SELECT count(*) FROM title)                                   AS titles,
+           (SELECT strftime('%Y-%m-%d %H:%M', min(ts),$LOCAL) FROM event) AS first_event,
+           (SELECT strftime('%Y-%m-%d %H:%M', max(ts),$LOCAL) FROM event) AS last_event;"
+  print "db: $DB  ($(du -h "$DB" | cut -f1))"
+}
+
+cmd_top() {
+  parse_opts "$@"
+  local d=$(dim_expr $BY)
+  $SQLITE -box "$DB" "
+    WITH agg AS (
+      SELECT $d AS label, sum(e.n) AS n, count(DISTINCT a.id) AS apps,
+             max(e.ts) AS last_ts
+      $FROM WHERE $WHERE GROUP BY label
+    ), m AS (SELECT max(n) AS mx, sum(n) AS total FROM agg)
+    SELECT label AS \"$BY\", n,
+           printf('%.1f%%', 100.0*n/m.total) AS pct,
+           substr('██████████████████████████████',1,cast(round(30.0*n/m.mx) AS int)) AS bar,
+           strftime('%m-%d %H:%M', last_ts,$LOCAL) AS last
+    FROM agg, m ORDER BY n DESC LIMIT $LIMIT;"
+}
+
+cmd_pivot() {
+  parse_opts "$@"
+  local r=$(dim_expr $ROWS) c=$(dim_expr $COLS)
+  # Column set is dynamic, so the pivot SQL is generated then executed.
+  local cols=$($SQLITE "$DB" "
+    SELECT group_concat(q,',') FROM (
+      SELECT '''' || replace(label,'''','''''') || ''' AS col' AS q FROM (
+        SELECT $c AS label, sum(e.n) AS n $FROM WHERE $WHERE
+        GROUP BY label ORDER BY n DESC LIMIT 12))")
+  local cases=$($SQLITE "$DB" "
+    SELECT group_concat(q,', ') FROM (
+      SELECT 'sum(CASE WHEN col = ''' || replace(label,'''','''''') || ''' THEN n ELSE 0 END) AS \"' || replace(label,'\"','') || '\"' AS q
+      FROM (SELECT $c AS label, sum(e.n) AS n $FROM WHERE $WHERE
+            GROUP BY label ORDER BY n DESC LIMIT 12))")
+  [[ -n $cases ]] || die "no data in range"
+  $SQLITE -box "$DB" "
+    WITH base AS (SELECT $r AS row_label, $c AS col, sum(e.n) AS n
+                  $FROM WHERE $WHERE GROUP BY row_label, col)
+    SELECT row_label AS \"$ROWS\", $cases, sum(n) AS total
+    FROM base GROUP BY row_label ORDER BY total DESC LIMIT $LIMIT;"
+}
+
+cmd_time() {
+  parse_opts "$@"
+  local d=$(dim_expr $BUCKET)
+  $SQLITE -box "$DB" "
+    WITH agg AS (SELECT $d AS bucket, sum(e.n) AS n, count(DISTINCT e.keycode||e.mods) AS combos
+                 $FROM WHERE $WHERE GROUP BY bucket),
+         m AS (SELECT max(n) AS mx FROM agg)
+    SELECT bucket AS \"$BUCKET\", n, combos,
+           substr('██████████████████████████████████████████',1,cast(round(42.0*n/m.mx) AS int)) AS bar
+    FROM agg, m ORDER BY bucket;"
+}
+
+cmd_apps()   { parse_opts "$@"; BY=app;   cmd_top --since $SINCE --until $UNTIL --by app   --limit $LIMIT }
+cmd_titles() {
+  parse_opts "$@"
+  $SQLITE -box "$DB" "
+    SELECT a.name AS app, substr(coalesce(t.norm,'(no title)'),1,60) AS title, sum(e.n) AS n
+    $FROM WHERE $WHERE GROUP BY a.name, t.norm ORDER BY n DESC LIMIT $LIMIT;"
+}
+
+# Combos listed in FILE that were never used in the range — one combo per line,
+# written the way the database stores modifiers: cmd+shift+p
+cmd_unused() {
+  parse_opts "$@"
+  [[ -n $FROMFILE && -f $FROMFILE ]] || die "--from FILE required (one combo per line, e.g. cmd+shift+p)"
+  print "unused since $SINCE:"
+  local line mods key n
+  while IFS= read -r line; do
+    if [[ -z ${line// } || $line == \#* ]]; then continue; fi
+    key=${line##*+}; mods=${line%+*}
+    if [[ $mods == $key ]]; then mods=; fi
+    n=$($SQLITE "$DB" "SELECT coalesce(sum(e.n),0) $FROM WHERE $WHERE AND e.mods='$(sql_quote "$mods")' AND k.name='$(sql_quote "$key")'")
+    if (( n == 0 )); then print "  $line"; fi
+  done < $FROMFILE
+}
+
+cmd_prune() {
+  parse_opts "$@"
+  [[ -n $OLDER ]] || die "--older-than required, e.g. --older-than 90d"
+  local cut=$(epoch_of $OLDER)
+  print "rolling up events before $(date -r $cut '+%Y-%m-%d %H:%M') to hour granularity (window titles dropped)"
+  $SQLITE "$DB" "
+    BEGIN IMMEDIATE;
+    CREATE TEMP TABLE rolled AS
+      SELECT (ts/3600)*3600 AS ts, app_id, NULL AS title_id, mods, keycode, sum(n) AS n
+      FROM event WHERE ts < $cut GROUP BY 1,2,4,5;
+    DELETE FROM event WHERE ts < $cut;
+    INSERT INTO event(ts,app_id,title_id,mods,keycode,n) SELECT ts,app_id,title_id,mods,keycode,n FROM rolled;
+    DELETE FROM title WHERE id NOT IN (SELECT title_id FROM event WHERE title_id IS NOT NULL);
+    COMMIT;
+    VACUUM;"
+  cmd_status
+}
+
+cmd_sql() { [[ $# -ge 1 ]] || die "usage: keystats sql \"SELECT ...\""; $SQLITE -box "$DB" "$1" }
+
+cmd_report() {
+  parse_opts "$@"
+  [[ -f $TEMPLATE ]] || die "template missing: $TEMPLATE"
+  local out=${OUT:-${DB:h}/report.html}
+  local tmp=$(mktemp -t keystats-data)
+
+  # Three bounded datasets; the page does all pivoting client-side.
+  {
+    print -n '{"meta":'
+    $SQLITE -json "$DB" "
+      SELECT '$SINCE' AS since, $TS_FROM AS ts_from, $TS_TO AS ts_to,
+             coalesce(sum(e.n),0) AS total,
+             count(DISTINCT e.mods||'/'||e.keycode) AS combos,
+             count(DISTINCT a.id) AS apps,
+             strftime('%Y-%m-%d %H:%M', min(e.ts),$LOCAL) AS first_event,
+             strftime('%Y-%m-%d %H:%M', max(e.ts),$LOCAL) AS last_event
+      $FROM WHERE $WHERE" | sed 's/^\[//; s/\]$//'
+    print -n ',"combos":'
+    $SQLITE -json "$DB" "
+      SELECT a.name AS app, e.mods AS mods, k.name AS key, sum(e.n) AS n
+      $FROM WHERE $WHERE GROUP BY 1,2,3 ORDER BY n DESC"
+    print -n ',"timeline":'
+    $SQLITE -json "$DB" "
+      SELECT (e.ts/3600)*3600 AS h, a.name AS app, sum(e.n) AS n
+      $FROM WHERE $WHERE GROUP BY 1,2 ORDER BY 1"
+    print -n ',"titleCombos":'
+    $SQLITE -json "$DB" "
+      WITH top AS (SELECT t.id FROM event e JOIN title t ON t.id=e.title_id
+                   WHERE $WHERE GROUP BY t.id ORDER BY sum(e.n) DESC LIMIT 40)
+      SELECT a.name AS app, t.norm AS title, e.mods AS mods, k.name AS key, sum(e.n) AS n
+      $FROM WHERE $WHERE AND t.id IN (SELECT id FROM top) GROUP BY 1,2,3,4 ORDER BY n DESC"
+    print -n '}'
+  } > $tmp
+
+  # Substitute via a file read so no shell escaping of the JSON is needed.
+  DATA_FILE=$tmp TEMPLATE=$TEMPLATE OUT=$out python3 -c '
+import os
+tpl = open(os.environ["TEMPLATE"]).read()
+data = open(os.environ["DATA_FILE"]).read()
+marker = "/*__KEYSTATS_DATA__*/null"
+assert marker in tpl, "template lost its data marker"
+open(os.environ["OUT"], "w").write(tpl.replace(marker, data))
+'
+  rm -f $tmp
+  print "wrote $out"
+  if (( OPEN )); then open "$out"; fi
+}
+
+usage() {
+  cat <<'EOF'
+keystats — shortcut usage statistics
+
+  keystats status
+  keystats top    [--by combo|key|mods|app|title|day|hour|dow] [--since 7d] [--app X] [--limit N]
+  keystats pivot  --rows <dim> --cols <dim> [--since 30d] [--limit N]
+  keystats time   [--bucket hour|day|week|month|dow|hourofday] [--since 30d] [--app X]
+  keystats apps   [--since 7d] [--limit N]
+  keystats titles [--app X] [--since 7d] [--limit N]
+  keystats unused --from FILE [--since 30d]
+  keystats report [--since 30d] [--out FILE] [--open]
+  keystats sql    "SELECT ..."
+  keystats prune  --older-than 90d
+
+Filters accepted by every query command: --since --until --app --title --mods --key
+Time values: all | today | yesterday | now | 7d | 24h | 90m | 4w | 3mo | YYYY-MM-DD
+Dimensions:  combo key mods app bundle title hour day week month dow hourofday
+EOF
+}
+
+cmd=${1:-help}; (( $# )) && shift || true
+case $cmd in
+  status) cmd_status "$@" ;;
+  top)    cmd_top "$@" ;;
+  pivot)  cmd_pivot "$@" ;;
+  time)   cmd_time "$@" ;;
+  apps)   cmd_apps "$@" ;;
+  titles) cmd_titles "$@" ;;
+  unused) cmd_unused "$@" ;;
+  report) cmd_report "$@" ;;
+  prune)  cmd_prune "$@" ;;
+  sql)    cmd_sql "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac
