@@ -215,7 +215,8 @@ footer code { color: var(--muted); }
     <h2>全局 vs app 内 <span class="scope" id="globalNote"></span></h2>
     <table id="globalTable">
       <thead><tr><th>组合键</th><th class="n">按键</th><th class="n">App 数</th>
-        <th class="n">离散度</th><th class="n">切换命中</th><th>判定</th></tr></thead>
+        <th class="n">离散度</th><th class="n">切换命中</th><th class="n">目标数</th>
+        <th class="n">集中度</th><th>判定</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -519,9 +520,16 @@ function render() {
 }
 
 // A global hotkey is consumed before any app sees it, so "which app was frontmost"
-// is all the tap can record. Two signals narrow it down: an app activation caught
-// right after the keystroke (hard evidence, but only when the press is still in
-// the collector's buffer), and how evenly the combination spreads over apps.
+// is all the tap can record. Three signals narrow it down: app activations caught
+// right after the keystroke, how concentrated those are on one target, and how
+// evenly the combination spreads over apps.
+//
+// One activation proves nothing — closing the frontmost window brings another app
+// forward by itself — so switch evidence counts only from MIN_SWITCH_HITS up, and
+// activations scattered over many targets mean a switcher (cmd-tab), not a
+// launcher for any single app.
+const MIN_SWITCH_HITS = 3, FOCUS_MIN = 0.8;
+
 function renderGlobal(rows) {
   const perCombo = new Map();
   for (const r of rows) {
@@ -536,8 +544,9 @@ function renderGlobal(rows) {
   const switches = new Map();
   for (const sw of (DATA.switches || [])) {
     const k = (sw.mods || "") + "/" + sw.key;
-    const cur = switches.get(k) || { hits: 0, target: null, best: 0 };
+    const cur = switches.get(k) || { hits: 0, targets: 0, target: null, best: 0 };
     cur.hits += sw.n;
+    cur.targets += 1;
     if (sw.n > cur.best) { cur.best = sw.n; cur.target = sw.target; }
     switches.set(k, cur);
   }
@@ -547,23 +556,32 @@ function renderGlobal(rows) {
     for (const n of c.apps.values()) { const p = n / c.n; h -= p * Math.log2(p); }
     const spread = scale ? h / scale : 0;
     const sw = switches.get(k);
+    const focus = sw && sw.hits ? sw.best / sw.hits : null;
     let verdict, cls;
-    if (sw && sw.hits > 0) { verdict = `全局 → ${sw.target}`; cls = "s1"; }
-    else if (c.apps.size >= 4 && spread >= 0.6) { verdict = "疑似全局"; cls = "s4"; }
+    if (sw && sw.hits >= MIN_SWITCH_HITS && focus >= FOCUS_MIN) {
+      verdict = `全局 → ${sw.target}`; cls = "s1";
+    } else if (sw && sw.hits >= MIN_SWITCH_HITS) {
+      verdict = "全局 · 切换类"; cls = "s3";
+    } else if (c.apps.size >= 4 && spread >= 0.6) { verdict = "疑似全局"; cls = "s4"; }
     else if (c.apps.size === 1) { verdict = "app 内"; cls = "s9"; }
     else { verdict = "不确定"; cls = "s9"; }
-    return { ...c, spread, switches: sw ? sw.hits : 0, verdict, cls };
-  }).sort((a, b) => (b.switches > 0) - (a.switches > 0) || b.n - a.n).slice(0, 20);
+    return { ...c, spread, focus, switches: sw ? sw.hits : 0,
+             targets: sw ? sw.targets : 0, verdict, cls };
+  }).sort((a, b) => (b.switches >= MIN_SWITCH_HITS) - (a.switches >= MIN_SWITCH_HITS)
+                    || b.n - a.n).slice(0, 20);
 
-  el("globalNote").textContent = `切换命中 = 按键后 ${0.6}s 内前台 app 变化的次数 · 离散度 = app 分布熵 / log2(${appTotal})`;
+  el("globalNote").textContent = `切换命中 = 按键后 0.6s 内前台 app 变化的次数（≥${
+    MIN_SWITCH_HITS} 次才算证据） · 集中度 = 最常见目标占比 · 离散度 = app 分布熵 / log2(${appTotal})`;
   el("globalTable").querySelector("tbody").innerHTML = list.length ? list.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
       <td class="n">${fmt(r.n)}</td>
       <td class="n">${r.apps.size}</td>
       <td class="n">${r.spread.toFixed(2)}</td>
       <td class="n">${r.switches || "—"}</td>
+      <td class="n">${r.targets || "—"}</td>
+      <td class="n">${r.focus === null ? "—" : r.focus.toFixed(2)}</td>
       <td class="verdict"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--${r.cls});margin-right:6px"></span>${esc(r.verdict)}</td>
-    </tr>`).join("") : `<tr><td colspan="6" class="empty">无数据</td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="8" class="empty">无数据</td></tr>`;
 }
 
 function refreshSelects() {

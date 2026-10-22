@@ -185,12 +185,19 @@ cmd_unused() {
 }
 
 # A global hotkey is consumed before any app sees it, so the tap always credits
-# whoever was frontmost. Two pieces of evidence narrow it down: an app activation
-# recorded right after the keystroke (switch_to), and how evenly the combination
-# is spread over apps (normalised Shannon entropy — a per-app shortcut clusters
-# in one app, a global one shows up everywhere).
+# whoever was frontmost. Three pieces of evidence narrow it down: an app
+# activation recorded right after the keystroke (switch_to), how concentrated
+# those activations are on one target, and how evenly the combination is spread
+# over apps (normalised Shannon entropy — a per-app shortcut clusters in one
+# app, a global one shows up everywhere).
+#
+# A single activation proves nothing: closing the frontmost window can bring
+# another app forward on its own. So switch evidence only counts from
+# MIN_SWITCH_HITS up, and a hotkey whose activations scatter over many targets
+# is a switcher (cmd-tab) rather than a launcher for any one app.
 cmd_global() {
   parse_opts "$@"
+  local MIN_SWITCH_HITS=3 FOCUS_MIN=0.8
   local sym="replace(replace(replace(replace(replace(tot.mods,'ctrl','⌃'),'alt','⌥'),'shift','⇧'),'cmd','⌘'),'+','')"
   $SQLITE -box "$DB" "
     WITH ev AS (
@@ -208,7 +215,7 @@ cmd_global() {
       FROM event e WHERE e.ts >= $TS_FROM AND e.ts <= $TS_TO AND e.switch_to IS NOT NULL
       GROUP BY 1,2,3
     ), sw AS (
-      SELECT mods, keycode, sum(n) AS hits,
+      SELECT mods, keycode, sum(n) AS hits, count(*) AS targets, max(n) AS top_hits,
              (SELECT s.name FROM swx x2 JOIN app s ON s.id = x2.target_id
               WHERE x2.mods = swx.mods AND x2.keycode = swx.keycode
               ORDER BY x2.n DESC LIMIT 1) AS target
@@ -219,19 +226,22 @@ cmd_global() {
            tot.apps  AS apps,
            printf('%.2f', coalesce(ent.h,0) / log2(scale.apps)) AS spread,
            coalesce(sw.hits,0) AS switches,
-           coalesce(sw.target,'—') AS target,
+           coalesce(sw.targets,0) AS targets,
+           CASE WHEN sw.hits > 0 THEN printf('%.2f', 1.0*sw.top_hits/sw.hits) ELSE '—' END AS focus,
            CASE
-             WHEN coalesce(sw.hits,0) > 0 THEN '全局 → ' || sw.target
+             WHEN coalesce(sw.hits,0) >= $MIN_SWITCH_HITS
+                  AND 1.0*sw.top_hits/sw.hits >= $FOCUS_MIN THEN '全局 → ' || sw.target
+             WHEN coalesce(sw.hits,0) >= $MIN_SWITCH_HITS THEN '全局 · 切换类'
              WHEN tot.apps >= 4 AND coalesce(ent.h,0) / log2(scale.apps) >= 0.6 THEN '疑似全局'
              WHEN tot.apps = 1 THEN 'app 内'
              ELSE '不确定'
            END AS verdict
     FROM tot
-    JOIN ent   ON ent.mods = tot.mods AND ent.keycode = tot.keycode
+    JOIN ent ON ent.mods = tot.mods AND ent.keycode = tot.keycode
     LEFT JOIN sw ON sw.mods = tot.mods AND sw.keycode = tot.keycode
     LEFT JOIN keyname k ON k.keycode = tot.keycode
     CROSS JOIN scale
-    ORDER BY (coalesce(sw.hits,0) > 0) DESC, tot.total DESC
+    ORDER BY (coalesce(sw.hits,0) >= $MIN_SWITCH_HITS) DESC, tot.total DESC
     LIMIT $LIMIT;"
 }
 

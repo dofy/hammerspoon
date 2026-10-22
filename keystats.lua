@@ -73,6 +73,8 @@ local keyNames = {}
 local currentApp = { bundle = "unknown", name = "unknown" }
 local currentTitle = nil
 local lastKey = nil
+local lastQuit = nil
+local lastMark = nil
 local prevShutdownCallback
 
 local log = hs.logger.new("keystats", "info")
@@ -272,6 +274,14 @@ local function markSwitch(toBundle, toName)
     local row = buffer[bkey]
     if not row or row.bundle == toBundle then return end
 
+    -- Cmd-Q and friends end the frontmost app, and whatever was behind it comes
+    -- forward. That activation is a consequence of closing something, not a
+    -- hotkey summoning the target, so it is not evidence of anything.
+    if lastQuit and (hs.timer.secondsSinceEpoch() - lastQuit.at) <= window
+        and (lastQuit.bundle == row.bundle or lastQuit.name == row.name) then
+        return
+    end
+
     if row.n > 1 then
         row.n = row.n - 1
     else
@@ -292,6 +302,47 @@ local function markSwitch(toBundle, toName)
         }
         bufferCount = bufferCount + 1
     end
+    lastMark = { skey = sk, bkey = bkey, at = hs.timer.secondsSinceEpoch(),
+                 bundle = row.bundle, name = row.name, ts = row.ts, title = row.title,
+                 mods = row.mods, keycode = row.keycode }
+end
+
+-- NSWorkspaceDidTerminateApplication arrives *after* the next app activates, so
+-- a quit cannot be filtered out up front: by the time it is known, the keystroke
+-- has already been tagged. Take the tag back instead. Only works while the row
+-- is still buffered, which it is unless the quit lands across a flush boundary.
+local function unmarkSwitch(bundle, name)
+    if not lastMark then return end
+    local grace = M.config.globalSwitchWindow + 1.0
+    if (hs.timer.secondsSinceEpoch() - lastMark.at) > grace then
+        lastMark = nil
+        return
+    end
+    if lastMark.bundle ~= bundle and lastMark.name ~= name then return end
+
+    local srow = buffer[lastMark.skey]
+    if srow then
+        if srow.n > 1 then
+            srow.n = srow.n - 1
+        else
+            buffer[lastMark.skey] = nil
+            bufferCount = bufferCount - 1
+        end
+        local row = buffer[lastMark.bkey]
+        if row then
+            row.n = row.n + 1
+        else
+            buffer[lastMark.bkey] = {
+                ts = lastMark.ts, bundle = lastMark.bundle, name = lastMark.name,
+                title = lastMark.title, mods = lastMark.mods, keycode = lastMark.keycode, n = 1,
+            }
+            bufferCount = bufferCount + 1
+        end
+        if M.config.debug then
+            log.df("unmarked switch for %s (quit)", tostring(lastMark.bundle))
+        end
+    end
+    lastMark = nil
 end
 
 -- Context tracking -----------------------------------------------------
@@ -303,6 +354,15 @@ local function refreshTitle(win)
 end
 
 local function onAppEvent(name, event, app)
+    if event == hs.application.watcher.terminated then
+        -- bundleID() is often already nil on a dead application, so keep the
+        -- name as well and match on either.
+        local ok, bundle = pcall(function() return app and app:bundleID() end)
+        lastQuit = { at = hs.timer.secondsSinceEpoch(),
+                     bundle = (ok and bundle) or nil, name = name }
+        unmarkSwitch((ok and bundle) or nil, name)
+        return
+    end
     if event == hs.application.watcher.activated then
         local bundle = app:bundleID() or name or "unknown"
         -- Mark before switching context: markSwitch reads the buffered row.
@@ -427,7 +487,7 @@ function M.stop()
     end
     appCache, titleCache = {}, {}
     buffer, bufferCount = {}, 0
-    lastKey = nil
+    lastKey, lastQuit, lastMark = nil, nil, nil
     return M
 end
 

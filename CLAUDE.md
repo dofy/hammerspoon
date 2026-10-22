@@ -28,6 +28,10 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
   buffered keystroke, one press is split off and tagged with that app in `event.switch_to`,
   which is the only hard evidence available that a combination was a global hotkey (an event tap
   runs before any handler consumes the key, so the frontmost app is all it can otherwise see).
+  A quit arrives *after* the next app activates, so `unmarkSwitch` takes that tag back when the
+  app that was in front has terminated — otherwise `⌘Q` reads as a hotkey summoning whatever was
+  behind it. Verdicts additionally need three hits and a concentrated target, so `⌘Tab` reads as
+  a switcher rather than a launcher.
   `keystats/server.py` serves the dashboard live over loopback; `keystats/report.html` is shared
   by the server and by static `keystats report` output through two markers it substitutes. The callback makes **no** OS calls: the frontmost
   app comes from an `hs.application.watcher` and the window title from an `hs.window.filter`

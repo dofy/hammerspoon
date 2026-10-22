@@ -91,13 +91,22 @@ is in front is therefore filed under Cursor. Two signals narrow it down, and `ke
 (and the dashboard's **全局 vs app 内** panel) report both:
 
 - **switch hits** — when an app activation lands within `config.globalSwitchWindow` (0.6s) of a
-  keystroke, that target app is stored on the event. Hard evidence of a hotkey that summons an
-  app, but only when the press is still in the collector's in-memory buffer, so a press in the
-  last moments before a flush is missed. It also cannot see a global binding that changes nothing
-  about the frontmost app, such as a window-management hotkey.
+  keystroke, that target app is stored on the event. Only counts from three hits up: closing the
+  frontmost window brings another app forward on its own, so a single activation proves nothing.
+- **focus** — the share of those activations that went to the most common target. A launcher
+  always lands on the same app; `⌘Tab` scatters over everything, which reads as *switcher* rather
+  than a launcher for any one app.
 - **spread** — the Shannon entropy of the combination's distribution over apps, normalised by
   `log2(apps in range)`. A per-app shortcut clusters in one app; a global one shows up
   everywhere. Four or more apps and a spread of 0.6 or higher reads as *suspected global*.
+
+`⌘Q` used to look like a global hotkey, because quitting the frontmost app brings the next one
+forward. macOS reports the termination *after* that activation, so the quit cannot be filtered
+out up front; instead the collector takes the tag back when the app that was in front turns out
+to have quit. That only works while the press is still buffered, as does tagging itself — a
+keystroke in the last moments before a flush is missed either way. Neither signal can see a
+global binding that leaves the frontmost app alone, such as a window-management hotkey or
+Raycast's panel, which does not take activation.
 
 ### What it does and does not record
 
