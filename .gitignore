@@ -1,8 +1,5 @@
 # macOS
 .DS_Store
 
-# Runtime debug logs
-arc-to-chrome.log
-
 # Python bytecode
 __pycache__/

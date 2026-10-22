@@ -19,7 +19,6 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 **Module convention:** each `.lua` module returns a table `M` exposing a `M.config` table plus lifecycle functions `M.start()` / `M.stop()` / `M.toggle()`. `start()` must be idempotent (call `stop()` first if already running) and store event taps / window filters in module-private locals so `stop()` can tear them down. Follow this shape when adding modules.
 
 - `mouse-follow.lua` — warps the cursor to the center of a window's screen on focus. Uses an `hs.window.filter` for focus/creation events and an `hs.eventtap` on `leftMouseDown` to suppress warping right after a click (so clicking to focus doesn't move the mouse).
-- `dia-to-chrome.lua` — when Dia is the active app, `Cmd+Ctrl+C` opens the current tab URL in Chrome. Loaded and started in `init.lua`.
 - `keystats.lua` — shortcut-usage collector. An `hs.eventtap` on `keyDown` keeps only keys
   carrying cmd/alt/ctrl (shift counts only as a co-modifier unless the exact combination is
   named in `config.alwaysRecord`, which carries Raycast's `shift+space`; bare Escape / F-keys /

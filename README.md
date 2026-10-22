@@ -6,7 +6,6 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 
 - **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
 - **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application and the window title, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
-- **Dia → Chrome** (`dia-to-chrome.lua`) — while Dia is the active app, `⌘ + ⌃ + C` opens the current tab's URL in Chrome.
 - **Battery info** (`test.lua`) — an on-demand diagnostic that prints detailed battery stats (health, cycles, capacity, voltage…) to the Hammerspoon Console. Run `require("test").test()` in the Console.
 - **Manual reload** — press `⌘ + ⌥ + ⌃ + R` to reload the config at any time.
 - **Auto reload** — saving any `.lua` file under `~/.hammerspoon/` reloads the config automatically.
@@ -28,7 +27,6 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 ```
 init.lua          # entry point: loads modules, binds reload hotkey, starts the path watcher
 mouse-follow.lua  # mouse-follow module (config + start/stop/toggle)
-dia-to-chrome.lua # Cmd+Ctrl+C in Dia opens the current tab in Chrome
 keystats.lua      # shortcut-usage collector (writes ~/.local/share/keystats/keystats.db)
 keystats/keystats # CLI over that database
 keystats/server.py# live dashboard server (`keystats serve`)

@@ -12,10 +12,6 @@ mouseFollow.config.clickDetectWindow = 0.3
 -- Start modules
 mouseFollow.start()
 
--- Dia -> Chrome: 仅当 Dia 激活时,Cmd+Ctrl+C 用 Chrome 打开当前 tab URL
-local diaToChrome = require("dia-to-chrome")
-diaToChrome.start()
-
 -- Keystats: 记录带修饰键的按键，供 `keystats` CLI 统计快捷键使用情况
 local keystats = require("keystats")
 keystats.start()
