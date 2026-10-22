@@ -154,6 +154,21 @@ tbody tr:hover td { background: var(--track); }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.app { white-space: nowrap; }
 td.pct { color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+.tablewrap table { min-width: 620px; }
+th.barcol { width: 34%; }
+td.bar-cell { padding-right: 0; }
+td.bar-cell .track { display: block; background: var(--track); border-radius: 999px; height: 10px; overflow: hidden; }
+td.bar-cell .fill { display: block; height: 100%; border-radius: 999px; min-width: 3px; background: var(--accent); }
+
+details.panel > summary {
+  cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: baseline;
+  font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600;
+}
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::before { content: "▸"; color: var(--faint); }
+details.panel[open] > summary::before { content: "▾"; }
+
 .empty { color: var(--faint); padding: var(--sp-4) 0; text-align: center; }
 footer { color: var(--faint); font-size: 12px; display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--s3); display: inline-block; }
@@ -185,55 +200,48 @@ footer code { color: var(--muted); }
     <div class="kb" id="kb"></div>
   </div>
 
-  <!-- Two independent column stacks rather than two grid rows, so a short card
-       packs up against the one above it instead of waiting for the tall card
-       beside it to finish. -->
-  <div class="cols">
-    <div class="stack">
-      <div class="panel">
-        <h2>Top 组合键</h2>
-        <div id="topCombos"></div>
-      </div>
-      <div class="panel">
-        <h2>时段分布 <span class="scope">本地时间 0–23 时</span><span class="seg sm" id="hodSeg"></span></h2>
-        <div id="hod"></div>
-      </div>
-    </div>
-    <div class="stack">
-      <div class="panel">
-        <h2>App 分布 <span class="seg sm" id="appSeg"></span></h2>
-        <div id="appDist"></div>
-      </div>
-      <div class="panel">
-        <h2>修饰键分布 <span class="seg sm" id="modSeg"></span></h2>
-        <div id="modDist"></div>
-      </div>
-    </div>
-  </div>
-
+  <!-- The ranking and the global/in-app verdict were two views of the same
+       per-combination aggregate, so they are one table. -->
   <div class="panel">
-    <h2>全局 vs app 内 <span class="scope" id="globalNote"></span></h2>
-    <table id="globalTable">
-      <thead><tr><th>组合键</th><th class="n">按键</th><th class="n">App 数</th>
-        <th class="n">离散度</th><th class="n">切换命中</th><th class="n">目标数</th>
-        <th class="n">集中度</th><th>判定</th></tr></thead>
+    <h2>快捷键 <span class="scope" id="comboNote"></span></h2>
+    <div class="tablewrap"><table id="comboTable">
+      <thead><tr><th>组合键</th><th class="n">按键</th><th class="barcol"></th>
+        <th class="n">占比</th><th class="n">App 数</th><th class="n">离散度</th>
+        <th class="n">切换命中</th><th>判定</th></tr></thead>
       <tbody></tbody>
-    </table>
+    </table></div>
   </div>
 
-  <div class="panel">
-    <h2>趋势 <span class="scope" id="trendScope"></span>
-      <span class="seg sm" id="bucketSeg"></span><span class="seg sm" id="trendSeg"></span></h2>
-    <div id="trend"></div>
+  <div class="cols">
+    <div class="panel">
+      <h2>App 分布 <span class="seg sm" id="appSeg"></span></h2>
+      <div id="appDist"></div>
+    </div>
+    <div class="panel">
+      <h2>修饰键分布 <span class="seg sm" id="modSeg"></span></h2>
+      <div id="modDist"></div>
+    </div>
   </div>
 
-  <div class="panel">
-    <h2>明细 <span class="scope">组合键 × app</span></h2>
-    <table id="detail">
+  <div class="cols">
+    <div class="panel">
+      <h2>时段分布 <span class="scope">本地 0–23 时</span><span class="seg sm" id="hodSeg"></span></h2>
+      <div id="hod"></div>
+    </div>
+    <div class="panel">
+      <h2>趋势 <span class="scope" id="trendScope"></span>
+        <span class="seg sm" id="bucketSeg"></span><span class="seg sm" id="trendSeg"></span></h2>
+      <div id="trend"></div>
+    </div>
+  </div>
+
+  <details class="panel" id="detailPanel">
+    <summary><span class="sumtitle">明细</span> <span class="scope">组合键 × app</span></summary>
+    <div class="tablewrap"><table id="detail">
       <thead id="detailHead"></thead>
       <tbody></tbody>
-    </table>
-  </div>
+    </table></div>
+  </details>
 
   <footer id="foot"></footer>
 </div>
@@ -450,16 +458,7 @@ function render() {
   drawKeyboard(rows);
   el("kbScope").textContent = state.app || "全部";
 
-  const comboMap = new Map();
-  for (const r of rows) {
-    const k = (r.mods || "") + "/" + r.key;
-    const cur = comboMap.get(k) || { mods: r.mods || "", key: r.key, n: 0 };
-    cur.n += r.n;
-    comboMap.set(k, cur);
-  }
-  const comboList = [...comboMap.values()].sort((a, b) => b.n - a.n);
-  barList(el("topCombos"), comboList.slice(0, 14)
-    .map(c => ({ label: prettyCombo(c.mods, c.key), html: comboHTML(c.mods, c.key), n: c.n })));
+  renderCombos(rows, total);
 
   const appMap = new Map();
   for (const r of rows) appMap.set(r.app, (appMap.get(r.app) || 0) + r.n);
@@ -487,12 +486,10 @@ function render() {
     (b, i, len) => (i % Math.ceil(len / 12) === 0 ? b.label.slice(5) : ""));
   el("trendScope").textContent = `按${BUCKET_CN[state.bucket]}` + (state.app ? ` · ${state.app}` : "");
 
-  renderGlobal(rows);
-
   const cols = ["组合键", "App", "按键", "占比"];
   el("detailHead").innerHTML = `<tr>${cols.map(c =>
     `<th${c === "按键" || c === "占比" ? ' class="n"' : ""}>${c}</th>`).join("")}</tr>`;
-  const detail = [...rows].sort((a, b) => b.n - a.n).slice(0, 60);
+  const detail = [...rows].sort((a, b) => b.n - a.n).slice(0, 40);
   el("detail").querySelector("tbody").innerHTML = detail.length ? detail.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
       <td class="app">${esc(r.app)}</td>
@@ -512,7 +509,7 @@ function render() {
 // launcher for any single app.
 const MIN_SWITCH_HITS = 3, FOCUS_MIN = 0.8;
 
-function renderGlobal(rows) {
+function renderCombos(rows, total) {
   const perCombo = new Map();
   for (const r of rows) {
     const k = (r.mods || "") + "/" + r.key;
@@ -549,19 +546,21 @@ function renderGlobal(rows) {
     else { verdict = "不确定"; cls = "s9"; }
     return { ...c, spread, focus, switches: sw ? sw.hits : 0,
              targets: sw ? sw.targets : 0, verdict, cls };
-  }).sort((a, b) => (b.switches >= MIN_SWITCH_HITS) - (a.switches >= MIN_SWITCH_HITS)
-                    || b.n - a.n).slice(0, 20);
+  }).sort((a, b) => b.n - a.n).slice(0, 16);
 
-  el("globalNote").textContent = `切换命中 = 按键后 0.6s 内前台 app 变化的次数（≥${
-    MIN_SWITCH_HITS} 次才算证据） · 集中度 = 最常见目标占比 · 离散度 = app 分布熵 / log2(${appTotal})`;
-  el("globalTable").querySelector("tbody").innerHTML = list.length ? list.map(r => `<tr>
+  el("comboNote").textContent = `按使用次数排序 · 离散度 = app 分布熵 / log2(${appTotal})`
+    + ` · 切换命中 = 按键后 0.6s 内前台 app 变化（≥${MIN_SWITCH_HITS} 次才算证据）`;
+  const mx = list.length ? list[0].n : 1;
+  el("comboTable").querySelector("tbody").innerHTML = list.length ? list.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
       <td class="n">${fmt(r.n)}</td>
+      <td class="bar-cell"><span class="track"><span class="fill" style="width:${
+        Math.max(1, 100 * r.n / mx)}%"></span></span></td>
+      <td class="pct">${pct(r.n, total)}</td>
       <td class="n">${r.apps.size}</td>
       <td class="n">${r.spread.toFixed(2)}</td>
-      <td class="n">${r.switches || "—"}</td>
-      <td class="n">${r.targets || "—"}</td>
-      <td class="n">${r.focus === null ? "—" : r.focus.toFixed(2)}</td>
+      <td class="n">${r.switches || "—"}${r.focus !== null && r.switches >= MIN_SWITCH_HITS
+        ? ` <span class="x">·${r.focus.toFixed(2)}</span>` : ""}</td>
       <td class="verdict"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--${r.cls});margin-right:6px"></span>${esc(r.verdict)}</td>
     </tr>`).join("") : `<tr><td colspan="8" class="empty">无数据</td></tr>`;
 }
