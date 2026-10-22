@@ -88,8 +88,10 @@ selectors.
 **生成分享图** rasterises the page itself into a PNG — preview, download, or copy to the
 clipboard. It needs no library and works from `file://`: the page is cloned into an
 `<svg><foreignObject>` together with its own stylesheet and drawn onto a canvas at 2×, which
-stays untainted only because the page loads no external image or font. The resolved theme is
-stamped onto the clone, since media queries inside the rasterised SVG cannot see the page's.
+stays untainted only because the page loads no external image or font. Inside that SVG the clone
+is not `:root`, so neither the dark media query nor `:root[data-theme]` matches it and
+`body { color }` never applies either; the resolved custom properties and text colour are copied
+onto the clone instead of relying on a selector.
 Interactive chrome carrying `data-noexport` — the share button itself, the pause button — is
 stripped first, and the detail table is captured in whatever state it is on screen.
 

@@ -657,6 +657,26 @@ async function load(force) {
 // a clone plus this page's own stylesheet needs no library and works from
 // file:// too; it only stays untainted because the page loads no external
 // image or font.
+// Every custom property this stylesheet declares, wherever it declares them, so
+// a token added later is carried into the export without touching this code.
+function customPropertyNames() {
+  const names = new Set();
+  const walk = rule => {
+    if (rule.style) {
+      for (const prop of rule.style) if (prop.startsWith("--")) names.add(prop);
+    }
+    if (rule.cssRules) for (const inner of rule.cssRules) walk(inner);
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      for (const rule of sheet.cssRules) walk(rule);
+    } catch (err) {
+      /* a cross-origin sheet cannot be read; this page has none */
+    }
+  }
+  return names;
+}
+
 async function renderShareImage(scale = 2) {
   const wrap = document.querySelector(".wrap");
   const width = Math.ceil(wrap.getBoundingClientRect().width);
@@ -664,12 +684,18 @@ async function renderShareImage(scale = 2) {
 
   const clone = wrap.cloneNode(true);
   clone.querySelectorAll("[data-noexport]").forEach(n => n.remove());
-  // Media queries inside the rasterised SVG do not see the page's resolved
-  // theme, so stamp it; the stylesheet honours data-theme in both directions.
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches
-    && document.documentElement.dataset.theme !== "light";
-  clone.setAttribute("data-theme", dark ? "dark" : "light");
+
+  // Inside the rasterised SVG the clone is not :root — the foreignObject's own
+  // document root is — so neither the dark media query nor :root[data-theme]
+  // matches and every token would fall back to the light block. Copy the
+  // resolved values onto the clone instead of relying on a selector matching.
+  const rootStyle = getComputedStyle(document.documentElement);
+  for (const name of customPropertyNames()) {
+    const value = rootStyle.getPropertyValue(name);
+    if (value) clone.style.setProperty(name, value.trim());
+  }
   clone.style.background = getComputedStyle(document.body).backgroundColor;
+  clone.style.color = rootStyle.getPropertyValue("--ink").trim();
   clone.style.padding = "24px";
   clone.style.boxSizing = "content-box";
 
