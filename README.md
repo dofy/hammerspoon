@@ -5,7 +5,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 ## Features
 
 - **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
-- **Keystats** (`keystats.lua`) — records every modifier-bearing keystroke, plus Escape, the function keys and the navigation keys, together with the frontmost application and the window title, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI described below.
+- **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application and the window title, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
 - **Dia → Chrome** (`dia-to-chrome.lua`) — while Dia is the active app, `⌘ + ⌃ + C` opens the current tab's URL in Chrome.
 - **Battery info** (`test.lua`) — an on-demand diagnostic that prints detailed battery stats (health, cycles, capacity, voltage…) to the Hammerspoon Console. Run `require("test").test()` in the Console.
 - **Manual reload** — press `⌘ + ⌥ + ⌃ + R` to reload the config at any time.
@@ -30,7 +30,9 @@ init.lua          # entry point: loads modules, binds reload hotkey, starts the 
 mouse-follow.lua  # mouse-follow module (config + start/stop/toggle)
 dia-to-chrome.lua # Cmd+Ctrl+C in Dia opens the current tab in Chrome
 keystats.lua      # shortcut-usage collector (writes ~/.local/share/keystats/keystats.db)
-keystats/         # `keystats` CLI + HTML report template for that database
+keystats/keystats # CLI over that database
+keystats/server.py# live dashboard server (`keystats serve`)
+keystats/report.html # dashboard page, used by both the live server and static reports
 test.lua          # battery-info diagnostic (loaded on demand)
 Spoons/           # bundled Spoons
 ```
@@ -44,6 +46,7 @@ ln -s ~/.hammerspoon/keystats/keystats ~/.local/bin/keystats
 ```
 
 ```sh
+keystats serve --open                              # live dashboard, polls every 5s
 keystats status                                    # rows, date range, db size
 keystats top --since 7d --app Cursor                # most used shortcuts in one app
 keystats top --by title --since 30d                 # which documents drive the keystrokes
@@ -51,7 +54,8 @@ keystats pivot --rows app --cols mods --since 30d   # any two dimensions crossed
 keystats time --bucket hourofday                    # when during the day you press them
 keystats titles --app Ghostty                       # busiest window titles
 keystats unused --from combos.txt --since 30d       # bindings you configured but never pressed
-keystats report --since 30d --open                  # local HTML dashboard
+keystats global --since 30d                         # global hotkey vs in-app shortcut
+keystats report --since 30d --open                  # static snapshot of the dashboard
 keystats sql "SELECT ..."                           # escape hatch
 keystats prune --older-than 90d                     # roll old events up to the hour
 ```
@@ -59,15 +63,48 @@ keystats prune --older-than 90d                     # roll old events up to the 
 Every query command accepts `--since` / `--until` / `--app` / `--title` / `--mods` / `--key`.
 Time values are `all`, `today`, `yesterday`, `7d`, `24h`, `90m`, `4w`, `3mo` or `YYYY-MM-DD`;
 dimensions are `combo`, `key`, `mods`, `app`, `bundle`, `title`, `hour`, `day`, `week`, `month`,
-`dow` and `hourofday`. `keystats report` writes a self-contained page with a keyboard heatmap,
-the top combinations, the per-app and per-modifier split, a time-of-day histogram and a trend
-chart, all of which re-pivot client-side when you change the app, title or bucket selectors.
+`dow` and `hourofday`.
+
+### The dashboard
+
+`keystats serve` starts a small read-only HTTP server on `127.0.0.1:8787` (`--port`, `--host`)
+and opens the same page the static report uses. It polls the database every five seconds, so the
+numbers move while you work; the footer carries the refresh clock and a pause button. The server
+binds to loopback on purpose — this database is a record of every shortcut you press.
+
+`keystats report` writes a self-contained snapshot of that page instead, for archiving or
+sharing. Both carry a keyboard heatmap, the top combinations, the per-app and per-modifier split
+(each switchable between bars and a donut), a time-of-day histogram and a trend chart (bars or a
+line), a global-vs-in-app verdict table, and a combination × app detail table. Everything
+re-pivots client-side from the app, modifier, granularity and dimension selectors.
+
+The **统计维度 / dimension** switch turns the window-title dimension on and off: `app` keeps the
+report per application, `app + 标题` adds the title filter, a title distribution panel and a
+title column in the detail table. The live server fetches titles on demand; a static report
+needs `keystats report --titles` for the switch to have data.
+
+### Global hotkey or in-app shortcut?
+
+An event tap sees a keystroke *before* any app or global hotkey handler consumes it, so the only
+app it can record is whoever was frontmost. A Raycast or Karabiner binding pressed while Cursor
+is in front is therefore filed under Cursor. Two signals narrow it down, and `keystats global`
+(and the dashboard's **全局 vs app 内** panel) report both:
+
+- **switch hits** — when an app activation lands within `config.globalSwitchWindow` (0.6s) of a
+  keystroke, that target app is stored on the event. Hard evidence of a hotkey that summons an
+  app, but only when the press is still in the collector's in-memory buffer, so a press in the
+  last moments before a flush is missed. It also cannot see a global binding that changes nothing
+  about the frontmost app, such as a window-management hotkey.
+- **spread** — the Shannon entropy of the combination's distribution over apps, normalised by
+  `log2(apps in range)`. A per-app shortcut clusters in one app; a global one shows up
+  everywhere. Four or more apps and a spread of 0.6 or higher reads as *suspected global*.
 
 ### What it does and does not record
 
-Plain character keys are **not** recorded (`keystats.lua` → `config.includePlainKeys`), so the
-database holds no typed text; only Shift-bearing combinations that also carry ⌘, ⌥ or ⌃ count as
-shortcuts. Modifier order is normalised to `ctrl+alt+shift+cmd`, and the `fn` flag is dropped,
+A keystroke is recorded only when it carries ⌘, ⌥ or ⌃. Shift alone is capitalisation, so it
+counts only as a co-modifier, and a bare arrow key, Escape or function key is navigation rather
+than a shortcut (`config.includeBareSpecialKeys` turns those back on). Plain character keys are
+never recorded unless `config.includePlainKeys` is set, so the database holds no typed text. Modifier order is normalised to `ctrl+alt+shift+cmd`, and the `fn` flag is dropped,
 because macOS sets it on every arrow and function key. Keys are stored as keycodes, so switching
 input source cannot split one physical key across two rows. Key repeats from holding a key down
 are skipped by default. Nothing is recorded while macOS secure input is active (password fields,

@@ -6,149 +6,261 @@
 <title>Keystats</title>
 <style>
 :root {
-  --bg: #f6f7f9; --panel: #ffffff; --ink: #14161a; --muted: #6b7280;
-  --line: #e4e7ec; --accent: #3b6ef5; --accent-soft: #dbe4fe;
-  --h0: #eef1f5; --h1: #d6e0fb; --h2: #aec4f8; --h3: #7fa0f2; --h4: #4b74e8; --h5: #2b4fbd;
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #14161a; --muted: #656d7b; --faint: #8b93a1;
+  --line: #e3e6ec; --track: #eef0f4; --accent: #3b6ef5; --accent-soft: #e3eafe;
+  --h0: #eef0f4; --h1: #d6e0fb; --h2: #aec4f8; --h3: #7fa0f2; --h4: #4b74e8; --h5: #2b4fbd;
+  --sp-1: 6px; --sp-2: 10px; --sp-3: 16px; --sp-4: 22px; --sp-5: 32px;
+  --radius: 12px; --radius-sm: 8px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", monospace;
+  --chev: #656d7b; --ink-hot: #ffffff; --ghost: #c9cfd9;
+  /* categorical series, fixed order, never cycled */
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948; --s9: #8b93a1;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #101216; --panel: #181b21; --ink: #e8eaee; --muted: #9aa2b1;
-    --line: #272b33; --accent: #7aa2ff; --accent-soft: #233056;
-    --h0: #1e222a; --h1: #24304d; --h2: #2f4878; --h3: #3c63a8; --h4: #5183d6; --h5: #7aa6f0;
+    --bg: #0e1014; --panel: #171a20; --ink: #e9ebef; --muted: #a2aab8; --faint: #7d8694;
+    --line: #262a32; --track: #21252d; --accent: #7aa2ff; --accent-soft: #223055;
+    --h0: #1d212a; --h1: #24304d; --h2: #2f4878; --h3: #3c63a8; --h4: #5183d6; --h5: #7aa6f0;
+    --chev: #a2aab8; --ink-hot: #0e1014; --ghost: #363c47;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --s9: #7d8694;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #101216; --panel: #181b21; --ink: #e8eaee; --muted: #9aa2b1;
-  --line: #272b33; --accent: #7aa2ff; --accent-soft: #233056;
-  --h0: #1e222a; --h1: #24304d; --h2: #2f4878; --h3: #3c63a8; --h4: #5183d6; --h5: #7aa6f0;
+  --bg: #0e1014; --panel: #171a20; --ink: #e9ebef; --muted: #a2aab8; --faint: #7d8694;
+  --line: #262a32; --track: #21252d; --accent: #7aa2ff; --accent-soft: #223055;
+  --h0: #1d212a; --h1: #24304d; --h2: #2f4878; --h3: #3c63a8; --h4: #5183d6; --h5: #7aa6f0;
+  --chev: #a2aab8; --ink-hot: #0e1014; --ghost: #363c47;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --s9: #7d8694;
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
-  font: 14px/1.5 ui-sans-serif, -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  margin: 0; padding: var(--sp-5) var(--sp-3) 72px; background: var(--bg); color: var(--ink);
+  font: 14px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 1120px; margin: 0 auto; }
-h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: .01em; }
-.sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-.panel > h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 14px; font-weight: 600; }
-.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-3); }
+header { margin-bottom: var(--sp-1); }
+h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: 0; }
+.sub { color: var(--muted); font-size: 13px; }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.panel > h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+  margin: 0; font-weight: 600; display: flex; gap: 8px; align-items: center;
+}
+.panel > h2 .scope { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; }
+.panel > h2 .seg { margin-left: auto; }
+
+.controls { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-3); }
+.ctrl { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.ctrl-k { font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.sel { position: relative; display: block; }
+.sel::after {
+  content: ""; position: absolute; right: 12px; top: 50%; width: 7px; height: 7px;
+  border-right: 1.6px solid var(--chev); border-bottom: 1.6px solid var(--chev);
+  transform: translateY(-70%) rotate(45deg); pointer-events: none;
+}
 select, button {
   font: inherit; color: var(--ink); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 7px 12px; height: 34px;
 }
-button { cursor: pointer; }
-button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
-.seg { display: inline-flex; gap: 4px; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-.kpi .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+select { appearance: none; -webkit-appearance: none; width: 100%; padding-right: 34px; text-overflow: ellipsis; }
+#fApp { min-width: 230px; } #fMods { min-width: 170px; }
+button { cursor: pointer; padding: 7px 14px; }
+button:hover { border-color: var(--chev); }
+button.on { background: var(--accent-soft); border-color: var(--accent); }
+.seg { display: inline-flex; gap: var(--sp-1); }
+.seg.sm button { height: 26px; padding: 2px 10px; font-size: 11px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-3); }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); }
+.kpi .v { font-size: 26px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .kpi .k { color: var(--muted); font-size: 12px; margin-top: 2px; }
-.cols { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; }
-@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
-.kb { display: flex; flex-direction: column; gap: 5px; overflow-x: auto; padding-bottom: 4px; }
-.kbrow { display: flex; gap: 5px; }
+
+.cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--sp-3); align-items: start; }
+@media (max-width: 880px) { .cols { grid-template-columns: 1fr; } }
+
+.kb { display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
+.kbrow { display: flex; gap: 6px; }
 .key {
-  position: relative; height: 38px; min-width: 38px; flex: 1 1 38px;
-  border-radius: 7px; border: 1px solid var(--line); background: var(--h0);
+  height: 40px; min-width: 40px; flex: 1 1 40px;
+  border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--h0);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-size: 11px; line-height: 1.1; color: var(--ink); cursor: default;
+  font-size: 12.5px; line-height: 1.15; color: var(--ink);
 }
 .key.w15 { flex-grow: 1.5; } .key.w20 { flex-grow: 2; } .key.w25 { flex-grow: 2.5; } .key.w60 { flex-grow: 6; }
-.key .n { font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.key[data-lvl="4"], .key[data-lvl="5"] { color: #fff; }
-.key[data-lvl="4"] .n, .key[data-lvl="5"] .n { color: rgba(255,255,255,.75); }
-.bars { display: flex; flex-direction: column; gap: 7px; }
-.bar { display: grid; grid-template-columns: minmax(74px, auto) 1fr minmax(58px, auto); gap: 10px; align-items: center; }
-.bar .lbl { font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar .track { display: block; background: var(--h0); border-radius: 5px; height: 14px; overflow: hidden; }
-.bar .fill { display: block; background: var(--accent); height: 100%; border-radius: 5px; }
-.bar .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
-.hist { display: flex; align-items: flex-end; gap: 3px; height: 110px; }
-.hist .col { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+.key .n { font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.key[data-lvl="3"] { color: #fff; }
+.key[data-lvl="3"] .n { color: rgba(255,255,255,.72); }
+.key[data-lvl="4"], .key[data-lvl="5"] { color: var(--ink-hot); border-color: transparent; }
+.key[data-lvl="4"] .n, .key[data-lvl="5"] .n { color: var(--ink-hot); opacity: .66; }
+
+/* Shortcut chips: four fixed modifier slots then the key, so every row lines up.
+   ⌃⌥⇧⌘ are missing from most monospace fonts, so alignment comes from a fixed
+   slot width rather than from the font's advance width. */
+.kc { display: inline-flex; align-items: baseline; white-space: nowrap;
+      font-variant-numeric: tabular-nums; font-size: 15px; line-height: 1.2; }
+.kc .m { display: inline-block; width: .95em; text-align: center; font-style: normal; }
+.kc .m.off { color: var(--ghost); }
+.kc .k { display: inline-block; margin-left: .3em; font-weight: 600; }
+
+/* one grid for the whole list, so every track starts at the same x */
+.bars { display: grid; grid-template-columns: minmax(0, 12em) 1fr max-content; column-gap: var(--sp-2); row-gap: 7px; align-items: center; }
+.bar { display: contents; }
+.bar .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { display: block; background: var(--track); border-radius: 999px; height: 12px; overflow: hidden; }
+.bar .fill { display: block; height: 100%; border-radius: 999px; min-width: 3px; background: var(--accent); }
+.bar .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+.pie { display: flex; gap: var(--sp-4); align-items: center; flex-wrap: wrap; }
+.pie svg { flex: 0 0 180px; width: 180px; height: 180px; }
+.legend { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+          column-gap: var(--sp-2); row-gap: 6px; align-items: center; flex: 1 1 220px; font-size: 13px; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.legend .l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend .v { text-align: right; font-variant-numeric: tabular-nums; }
+.legend .p { text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+.chart { display: flex; flex-direction: column; gap: var(--sp-1); }
+.hist { display: flex; align-items: flex-end; gap: 4px; height: 120px; }
+.hist .col { flex: 1; max-width: 64px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
 .hist .col:hover { background: var(--h5); }
-.axis { display: flex; gap: 3px; color: var(--muted); font-size: 10px; margin-top: 6px; }
-.axis span { flex: 1; text-align: center; }
-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-th { color: var(--muted); font-weight: 600; font-size: 12px; }
-td.n, th.n { text-align: right; }
-td.t { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empty { color: var(--muted); padding: 24px 0; text-align: center; }
-.combo { font-weight: 600; }
-footer { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.axis { display: flex; gap: 4px; color: var(--faint); font-size: 10px; }
+.axis span { flex: 1; max-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.lineclip { height: 120px; }
+.lineclip svg { width: 100%; height: 120px; display: block; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+thead th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--track); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.app { white-space: nowrap; }
+td.pct { color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.empty { color: var(--faint); padding: var(--sp-4) 0; text-align: center; }
+footer { color: var(--faint); font-size: 12px; display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--s3); display: inline-block; }
+.dot.off { background: var(--s9); }
+td.verdict { white-space: nowrap; }
+td.verdict b { font-weight: 600; }
+footer code { color: var(--muted); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Keystats</h1>
-  <div class="sub" id="sub"></div>
+  <header>
+    <h1>Keystats</h1>
+    <div class="sub" id="sub"></div>
+  </header>
 
   <div class="panel controls">
-    <label>App <select id="fApp"></select></label>
-    <label>窗口标题 <select id="fTitle"></select></label>
-    <label>修饰键 <select id="fMods"></select></label>
-    <span class="seg" id="bucketSeg"></span>
-    <button id="reset">重置</button>
+    <div class="ctrl" id="rangeCtrl" hidden><span class="ctrl-k">时间范围</span>
+      <span class="sel"><select id="fSince"></select></span></div>
+    <div class="ctrl"><span class="ctrl-k">App</span><span class="sel"><select id="fApp"></select></span></div>
+    <div class="ctrl" id="titleCtrl" hidden><span class="ctrl-k">窗口标题</span>
+      <span class="sel"><select id="fTitle"></select></span></div>
+    <div class="ctrl"><span class="ctrl-k">修饰键</span><span class="sel"><select id="fMods"></select></span></div>
+    <div class="ctrl"><span class="ctrl-k">时间粒度</span><span class="seg" id="bucketSeg"></span></div>
+    <div class="ctrl"><span class="ctrl-k">统计维度</span><span class="seg" id="dimSeg"></span></div>
+    <div class="ctrl"><span class="ctrl-k" aria-hidden="true">&nbsp;</span><button id="reset">重置</button></div>
   </div>
 
   <div class="kpis" id="kpis"></div>
 
   <div class="panel">
-    <h2>键盘热力图 <span id="kbScope" style="text-transform:none;letter-spacing:0"></span></h2>
+    <h2>键盘热力图 <span class="scope" id="kbScope"></span></h2>
     <div class="kb" id="kb"></div>
   </div>
 
   <div class="cols">
     <div class="panel">
       <h2>Top 组合键</h2>
-      <div class="bars" id="topCombos"></div>
+      <div id="topCombos"></div>
     </div>
     <div class="panel">
-      <h2>App 分布</h2>
-      <div class="bars" id="appDist"></div>
+      <h2>App 分布 <span class="seg sm" id="appSeg"></span></h2>
+      <div id="appDist"></div>
     </div>
   </div>
 
   <div class="cols">
     <div class="panel">
-      <h2>时段分布（本地时间 0–23 时）</h2>
-      <div class="hist" id="hod"></div>
-      <div class="axis" id="hodAxis"></div>
+      <h2>时段分布 <span class="scope">本地时间 0–23 时</span><span class="seg sm" id="hodSeg"></span></h2>
+      <div id="hod"></div>
     </div>
     <div class="panel">
-      <h2>修饰键分布</h2>
-      <div class="bars" id="modDist"></div>
+      <h2>修饰键分布 <span class="seg sm" id="modSeg"></span></h2>
+      <div id="modDist"></div>
     </div>
   </div>
 
-  <div class="panel">
-    <h2>趋势 <span id="trendScope" style="text-transform:none;letter-spacing:0"></span></h2>
-    <div class="hist" id="trend"></div>
-    <div class="axis" id="trendAxis"></div>
+  <div class="panel" id="titlePanel" hidden>
+    <h2>窗口标题分布 <span class="scope">Top 60</span><span class="seg sm" id="titleSeg"></span></h2>
+    <div id="titleDist"></div>
   </div>
 
   <div class="panel">
-    <h2>窗口标题 Top 40</h2>
-    <table id="titleTable"><thead><tr><th>App</th><th>标题</th><th class="n">按键</th><th>主力组合键</th></tr></thead><tbody></tbody></table>
+    <h2>全局 vs app 内 <span class="scope" id="globalNote"></span></h2>
+    <table id="globalTable">
+      <thead><tr><th>组合键</th><th class="n">按键</th><th class="n">App 数</th>
+        <th class="n">离散度</th><th class="n">切换命中</th><th>判定</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
 
-  <footer>数据来源 <code>~/.local/share/keystats/keystats.db</code> · 重新生成：<code>keystats report --since 30d --open</code></footer>
+  <div class="panel">
+    <h2>趋势 <span class="scope" id="trendScope"></span><span class="seg sm" id="trendSeg"></span></h2>
+    <div id="trend"></div>
+  </div>
+
+  <div class="panel">
+    <h2>明细 <span class="scope">组合键 × app</span></h2>
+    <table id="detail">
+      <thead id="detailHead"></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <footer id="foot"></footer>
 </div>
 
 <script>
-const DATA = /*__KEYSTATS_DATA__*/null;
+let DATA = /*__KEYSTATS_DATA__*/null;
+const API = /*__KEYSTATS_API__*/null;   // set by `keystats serve`; null in a static report
+const POLL_MS = 5000;
 
 const SYM = { ctrl: "⌃", alt: "⌥", shift: "⇧", cmd: "⌘" };
-const prettyMods = m => m ? m.split("+").map(x => SYM[x] || x).join("") : "";
+const MOD_SLOTS = [["ctrl", "⌃"], ["alt", "⌥"], ["shift", "⇧"], ["cmd", "⌘"]];
 const KEYSYM = {
   escape: "⎋", delete: "⌫", forwarddelete: "⌦", return: "⏎", tab: "⇥", space: "␣",
   left: "←", right: "→", up: "↑", down: "↓",
   home: "↖", end: "↘", pageup: "⇞", pagedown: "⇟", help: "?"
 };
+const BUCKET_CN = { hour: "小时", day: "天", week: "周", month: "月" };
+const SERIES_MAX = 8;
+
+const prettyMods = m => m ? m.split("+").map(x => SYM[x] || x).join("") : "";
 const prettyKey = k => KEYSYM[k] || ((k && k.length === 1) ? k.toUpperCase() : (k || "?"));
 const prettyCombo = (m, k) => prettyMods(m) + prettyKey(k);
 const fmt = n => n.toLocaleString();
+const pct = (n, t) => t ? (100 * n / t).toFixed(1) + "%" : "0%";
+const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const el = id => document.getElementById(id);
+
+// Four modifier slots, greyed out when unused, then the key itself.
+function comboHTML(mods, key) {
+  const on = new Set(String(mods || "").split("+").filter(Boolean));
+  const slots = MOD_SLOTS.map(([n, sym]) => `<i class="m${on.has(n) ? "" : " off"}">${sym}</i>`).join("");
+  return `<span class="kc">${slots}${key == null ? "" : `<b class="k">${esc(prettyKey(key))}</b>`}</span>`;
+}
 
 const LAYOUT = [
   [["escape","⎋","w15"],["f1","F1"],["f2","F2"],["f3","F3"],["f4","F4"],["f5","F5"],["f6","F6"],
@@ -165,20 +277,20 @@ const LAYOUT = [
    ["alt","⌥"],["left","←"],["up","↑"],["down","↓"],["right","→"]]
 ];
 
-const el = id => document.getElementById(id);
-const state = { app: "", title: "", mods: "", bucket: "day" };
+const SINCE_OPTS = [["today", "今天"], ["2d", "48 小时"], ["7d", "7 天"], ["30d", "30 天"],
+                    ["3mo", "3 个月"], ["all", "全部"]];
 
-function uniqSorted(rows, key) {
-  const m = new Map();
-  for (const r of rows) m.set(r[key], (m.get(r[key]) || 0) + r.n);
-  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
-}
+const state = {
+  app: "", title: "", mods: "", bucket: "day", since: "7d", titles: false, paused: false,
+  chart: { app: "bar", mod: "bar", title: "bar", hod: "bar", trend: "bar" },
+};
 
-// When a window title is selected the per-title dataset becomes the source,
-// because `combos` is only aggregated down to the app level.
+// With the title dimension on, the title dataset is the finer-grained source;
+// it only covers the top titles, so it is used only when a title is selected.
 function activeRows() {
-  let rows = state.title ? DATA.titleCombos.filter(r => r.title === state.title) : DATA.combos;
+  let rows = (state.titles && state.title && DATA.titles) ? DATA.titles : DATA.combos;
   if (state.app) rows = rows.filter(r => r.app === state.app);
+  if (state.title && rows !== DATA.combos) rows = rows.filter(r => r.title === state.title);
   if (state.mods !== "") rows = rows.filter(r => (r.mods || "") === state.mods);
   return rows;
 }
@@ -196,63 +308,115 @@ function fillSelect(sel, values, label, current) {
   sel.value = current;
 }
 
-function barList(node, items, max) {
-  node.innerHTML = "";
+function segment(node, options, current, onPick) {
+  node.innerHTML = options.map(([v, t]) =>
+    `<button data-v="${v}" class="${v === current ? "on" : ""}">${t}</button>`).join("");
+  node.onclick = e => {
+    const v = e.target.dataset.v; if (!v) return;
+    [...node.children].forEach(c => c.classList.toggle("on", c.dataset.v === v));
+    onPick(v);
+  };
+}
+
+// --- marks ----------------------------------------------------------------
+function barList(node, items) {
   if (!items.length) { node.innerHTML = '<div class="empty">无数据</div>'; return; }
-  const mx = max || items[0].n;
-  for (const it of items) {
-    const row = document.createElement("div");
-    row.className = "bar";
-    row.innerHTML = `<span class="lbl ${it.cls || ""}">${it.label}</span>
-      <span class="track"><span class="fill" style="width:${Math.max(1, 100 * it.n / mx)}%"></span></span>
-      <span class="num">${fmt(it.n)}</span>`;
-    node.append(row);
+  const mx = items[0].n;
+  node.innerHTML = `<div class="bars">` + items.map((it, i) => `<div class="bar">
+      <span class="lbl" title="${esc(it.label)}">${it.html || esc(it.label)}</span>
+      <span class="track"><span class="fill" style="width:${Math.max(1, 100 * it.n / mx)}%${
+        it.color ? ";background:" + it.color : ""}"></span></span>
+      <span class="num">${fmt(it.n)}</span>
+    </div>`).join("") + `</div>`;
+}
+
+// Fold past the eighth slot into "其他" — categorical hues are never cycled.
+function foldSeries(items) {
+  if (items.length <= SERIES_MAX) return items.map((it, i) => ({ ...it, color: `var(--s${i + 1})` }));
+  const head = items.slice(0, SERIES_MAX - 1).map((it, i) => ({ ...it, color: `var(--s${i + 1})` }));
+  const rest = items.slice(SERIES_MAX - 1);
+  head.push({ label: `其他 (${rest.length})`, n: rest.reduce((s, r) => s + r.n, 0), color: "var(--s9)" });
+  return head;
+}
+
+function donut(node, items) {
+  if (!items.length) { node.innerHTML = '<div class="empty">无数据</div>'; return; }
+  const total = items.reduce((s, i) => s + i.n, 0);
+  const cx = 100, cy = 100, R = 88, r = 54;
+  let a = -Math.PI / 2, marks = "";
+  if (items.length === 1) {
+    marks = `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none"
+      stroke="${items[0].color}" stroke-width="${R - r}"><title>${esc(items[0].label)} ${fmt(total)} 100%</title></circle>`;
+  } else {
+    for (const it of items) {
+      const span = (it.n / total) * Math.PI * 2, b = a + span;
+      const big = span > Math.PI ? 1 : 0;
+      const pt = (ang, rad) => `${(cx + rad * Math.cos(ang)).toFixed(2)} ${(cy + rad * Math.sin(ang)).toFixed(2)}`;
+      marks += `<path d="M${pt(a, R)}A${R} ${R} 0 ${big} 1 ${pt(b, R)}L${pt(b, r)}A${r} ${r} 0 ${big} 0 ${pt(a, r)}Z"
+        fill="${it.color}" stroke="var(--panel)" stroke-width="2"
+        ><title>${esc(it.label)} ${fmt(it.n)} ${pct(it.n, total)}</title></path>`;
+      a = b;
+    }
+  }
+  // Values live in the legend as well, so identity is never colour-alone.
+  node.innerHTML = `<div class="pie">
+      <svg viewBox="0 0 200 200" role="img" aria-label="分布饼图">${marks}</svg>
+      <div class="legend">${items.map(it => `
+        <span class="sw" style="background:${it.color}"></span>
+        <span class="l" title="${esc(it.label)}">${it.html || esc(it.label)}</span>
+        <span class="v">${fmt(it.n)}</span>
+        <span class="p">${pct(it.n, total)}</span>`).join("")}</div>
+    </div>`;
+}
+
+function drawDist(node, kind, items) {
+  if (kind === "pie") donut(node, foldSeries(items));
+  else barList(node, items);
+}
+
+function drawSeries(node, kind, buckets, labelFn) {
+  const mx = Math.max(1, ...buckets.map(b => b.n));
+  const axis = `<div class="axis">${buckets.map((b, i) =>
+    `<span>${esc(labelFn(b, i, buckets.length))}</span>`).join("")}</div>`;
+  if (kind === "line") {
+    const W = 1000, H = 120, pad = 4;
+    const x = i => buckets.length === 1 ? W / 2 : pad + i * (W - 2 * pad) / (buckets.length - 1);
+    const y = v => H - pad - (H - 2 * pad) * v / mx;
+    const pts = buckets.map((b, i) => `${x(i).toFixed(1)},${y(b.n).toFixed(1)}`).join(" ");
+    const area = `${x(0).toFixed(1)},${H} ${pts} ${x(buckets.length - 1).toFixed(1)},${H}`;
+    const dots = buckets.length <= 40 ? buckets.map((b, i) =>
+      `<circle cx="${x(i).toFixed(1)}" cy="${y(b.n).toFixed(1)}" r="4" fill="var(--accent)"
+         vector-effect="non-scaling-stroke"><title>${esc(b.label)} ${fmt(b.n)}</title></circle>`).join("") : "";
+    node.innerHTML = `<div class="chart"><div class="lineclip">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <polygon points="${area}" fill="var(--accent)" opacity=".12"></polygon>
+          <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2"
+            stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
+          ${dots}
+        </svg></div>${axis}</div>`;
+  } else {
+    node.innerHTML = `<div class="chart"><div class="hist">${buckets.map(b =>
+      `<div class="col" style="height:${Math.max(2, 100 * b.n / mx)}%" title="${esc(b.label)}  ${fmt(b.n)}"></div>`
+    ).join("")}</div>${axis}</div>`;
   }
 }
 
+// --- aggregation ----------------------------------------------------------
 function drawKeyboard(rows) {
   const per = new Map();
   for (const r of rows) per.set(r.key, (per.get(r.key) || 0) + r.n);
   const mx = Math.max(1, ...per.values());
-  const kb = el("kb");
-  kb.innerHTML = "";
-  for (const line of LAYOUT) {
-    const rowEl = document.createElement("div");
-    rowEl.className = "kbrow";
-    for (const [name, label, cls] of line) {
-      const n = per.get(name) || 0;
-      const lvl = n === 0 ? 0 : Math.min(5, 1 + Math.floor(4 * Math.log1p(n) / Math.log1p(mx)));
-      const k = document.createElement("div");
-      k.className = "key " + (cls || "");
-      k.dataset.lvl = lvl;
-      k.style.background = `var(--h${lvl})`;
-      k.title = `${label}  ${fmt(n)}`;
-      k.innerHTML = `<span>${label}</span>` + (n ? `<span class="n">${n > 999 ? (n / 1000).toFixed(1) + "k" : n}</span>` : "");
-      rowEl.append(k);
-    }
-    kb.append(rowEl);
-  }
-}
-
-function drawHistogram(node, axisNode, buckets, labelFn) {
-  const mx = Math.max(1, ...buckets.map(b => b.n));
-  node.innerHTML = ""; axisNode.innerHTML = "";
-  buckets.forEach((b, i) => {
-    const c = document.createElement("div");
-    c.className = "col";
-    c.style.height = `${Math.max(2, 100 * b.n / mx)}%`;
-    c.title = `${b.label}  ${fmt(b.n)}`;
-    node.append(c);
-    const s = document.createElement("span");
-    s.textContent = labelFn(b, i, buckets.length);
-    axisNode.append(s);
-  });
+  el("kb").innerHTML = LAYOUT.map(line => `<div class="kbrow">` + line.map(([name, label, cls]) => {
+    const n = per.get(name) || 0;
+    const lvl = n === 0 ? 0 : Math.min(5, 1 + Math.floor(4 * Math.log1p(n) / Math.log1p(mx)));
+    const num = n ? `<span class="n">${n > 999 ? (n / 1000).toFixed(1) + "k" : n}</span>` : "";
+    return `<div class="key ${cls || ""}" data-lvl="${lvl}" style="background:var(--h${lvl})"
+      title="${esc(label)}  ${fmt(n)}"><span>${esc(label)}</span>${num}</div>`;
+  }).join("") + `</div>`).join("");
 }
 
 function timelineRows() {
-  let rows = DATA.timeline;
-  if (state.app) rows = rows.filter(r => r.app === state.app);
-  return rows;
+  return state.app ? DATA.timeline.filter(r => r.app === state.app) : DATA.timeline;
 }
 
 function bucketKey(d, bucket) {
@@ -272,40 +436,39 @@ function render() {
   const days = Math.max(1, Math.round((DATA.meta.ts_to - DATA.meta.ts_from) / 86400));
 
   el("kpis").innerHTML = [
-    [fmt(total), "带修饰键按键"],
-    [fmt(combos), "独立组合键"],
-    [fmt(apps), "涉及 app"],
-    [fmt(Math.round(total / days)), "日均"],
+    [fmt(total), "带修饰键按键"], [fmt(combos), "独立组合键"],
+    [fmt(apps), "涉及 app"], [fmt(Math.round(total / days)), "日均"],
   ].map(([v, k]) => `<div class="kpi"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
 
   drawKeyboard(rows);
-  el("kbScope").textContent = state.app || state.title ? `· ${state.title || state.app}` : "· 全部";
+  el("kbScope").textContent = state.app || "全部";
 
   const comboMap = new Map();
   for (const r of rows) {
-    const k = prettyCombo(r.mods, r.key);
-    comboMap.set(k, (comboMap.get(k) || 0) + r.n);
+    const k = (r.mods || "") + "/" + r.key;
+    const cur = comboMap.get(k) || { mods: r.mods || "", key: r.key, n: 0 };
+    cur.n += r.n;
+    comboMap.set(k, cur);
   }
-  barList(el("topCombos"), [...comboMap].sort((a, b) => b[1] - a[1]).slice(0, 14)
-    .map(([label, n]) => ({ label, n, cls: "combo" })));
+  const comboList = [...comboMap.values()].sort((a, b) => b.n - a.n);
+  barList(el("topCombos"), comboList.slice(0, 14)
+    .map(c => ({ label: prettyCombo(c.mods, c.key), html: comboHTML(c.mods, c.key), n: c.n })));
 
   const appMap = new Map();
   for (const r of rows) appMap.set(r.app, (appMap.get(r.app) || 0) + r.n);
-  barList(el("appDist"), [...appMap].sort((a, b) => b[1] - a[1]).slice(0, 14)
-    .map(([label, n]) => ({ label, n })));
+  drawDist(el("appDist"), state.chart.app,
+    [...appMap].sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n })));
 
   const modMap = new Map();
-  for (const r of rows) {
-    const k = r.mods ? prettyMods(r.mods) : "(无)";
-    modMap.set(k, (modMap.get(k) || 0) + r.n);
-  }
-  barList(el("modDist"), [...modMap].sort((a, b) => b[1] - a[1]).slice(0, 12)
-    .map(([label, n]) => ({ label, n, cls: "combo" })));
+  for (const r of rows) modMap.set(r.mods || "", (modMap.get(r.mods || "") || 0) + r.n);
+  drawDist(el("modDist"), state.chart.mod,
+    [...modMap].sort((a, b) => b[1] - a[1]).map(([mods, n]) =>
+      ({ label: mods ? prettyMods(mods) : "(无修饰键)", html: comboHTML(mods, null), n })));
 
   const tl = timelineRows();
   const hod = Array.from({ length: 24 }, (_, i) => ({ label: `${i}:00`, n: 0 }));
   for (const r of tl) hod[new Date(r.h * 1000).getHours()].n += r.n;
-  drawHistogram(el("hod"), el("hodAxis"), hod, (b, i) => (i % 3 === 0 ? i : ""));
+  drawSeries(el("hod"), state.chart.hod, hod, (b, i) => (i % 3 === 0 ? i : ""));
 
   const tmap = new Map();
   for (const r of tl) {
@@ -313,63 +476,182 @@ function render() {
     tmap.set(k, (tmap.get(k) || 0) + r.n);
   }
   const trend = [...tmap].sort((a, b) => a[0] < b[0] ? -1 : 1).map(([label, n]) => ({ label, n }));
-  drawHistogram(el("trend"), el("trendAxis"), trend,
+  drawSeries(el("trend"), state.chart.trend, trend,
     (b, i, len) => (i % Math.ceil(len / 12) === 0 ? b.label.slice(5) : ""));
-  el("trendScope").textContent = `· 按${{ hour: "小时", day: "天", week: "周", month: "月" }[state.bucket]}` +
-    (state.app ? ` · ${state.app}` : "") + (state.title ? " · 标题筛选不影响趋势" : "");
+  el("trendScope").textContent = `按${BUCKET_CN[state.bucket]}` + (state.app ? ` · ${state.app}` : "");
 
-  const tt = new Map();
-  for (const r of DATA.titleCombos) {
-    if (state.app && r.app !== state.app) continue;
-    const k = r.app + "\u0000" + r.title;
-    const cur = tt.get(k) || { app: r.app, title: r.title, n: 0, top: null };
-    cur.n += r.n;
-    if (!cur.top || r.n > cur.top.n) cur.top = { label: prettyCombo(r.mods, r.key), n: r.n };
-    tt.set(k, cur);
+  const showTitles = state.titles && !!DATA.titles;
+  el("titlePanel").hidden = !showTitles;
+  el("titleCtrl").hidden = !showTitles;
+  if (showTitles) {
+    const titleMap = new Map();
+    for (const r of DATA.titles) {
+      if (state.app && r.app !== state.app) continue;
+      if (state.mods !== "" && (r.mods || "") !== state.mods) continue;
+      titleMap.set(r.title, (titleMap.get(r.title) || 0) + r.n);
+    }
+    drawDist(el("titleDist"), state.chart.title,
+      [...titleMap].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([label, n]) => ({ label, n })));
   }
-  const tbody = el("titleTable").querySelector("tbody");
-  const list = [...tt.values()].sort((a, b) => b.n - a.n).slice(0, 40);
-  tbody.innerHTML = list.length ? list.map(r => `<tr>
-      <td>${r.app}</td><td class="t" title="${r.title.replace(/"/g, "&quot;")}">${r.title}</td>
+
+  renderGlobal(rows);
+
+  const cols = showTitles
+    ? ["组合键", "App", "窗口标题", "按键", "占比"]
+    : ["组合键", "App", "按键", "占比"];
+  el("detailHead").innerHTML = `<tr>${cols.map(c =>
+    `<th${c === "按键" || c === "占比" ? ' class="n"' : ""}>${c}</th>`).join("")}</tr>`;
+  const detail = [...rows].sort((a, b) => b.n - a.n).slice(0, 60);
+  el("detail").querySelector("tbody").innerHTML = detail.length ? detail.map(r => `<tr>
+      <td>${comboHTML(r.mods, r.key)}</td>
+      <td class="app">${esc(r.app)}</td>
+      ${showTitles ? `<td class="t" title="${esc(r.title || "")}">${esc(r.title || "—")}</td>` : ""}
       <td class="n">${fmt(r.n)}</td>
-      <td class="combo">${r.top.label} <span style="color:var(--muted);font-weight:400">×${r.top.n}</span></td>
-    </tr>`).join("") : `<tr><td colspan="4" class="empty">无数据</td></tr>`;
+      <td class="pct">${pct(r.n, total)}</td>
+    </tr>`).join("") : `<tr><td colspan="${cols.length}" class="empty">无数据</td></tr>`;
 }
 
-function init() {
+// A global hotkey is consumed before any app sees it, so "which app was frontmost"
+// is all the tap can record. Two signals narrow it down: an app activation caught
+// right after the keystroke (hard evidence, but only when the press is still in
+// the collector's buffer), and how evenly the combination spreads over apps.
+function renderGlobal(rows) {
+  const perCombo = new Map();
+  for (const r of rows) {
+    const k = (r.mods || "") + "/" + r.key;
+    const c = perCombo.get(k) || { mods: r.mods || "", key: r.key, n: 0, apps: new Map() };
+    c.n += r.n;
+    c.apps.set(r.app, (c.apps.get(r.app) || 0) + r.n);
+    perCombo.set(k, c);
+  }
+  const appTotal = Math.max(2, new Set(rows.map(r => r.app)).size);
+  const scale = Math.log2(appTotal);
+  const switches = new Map();
+  for (const sw of (DATA.switches || [])) {
+    const k = (sw.mods || "") + "/" + sw.key;
+    const cur = switches.get(k) || { hits: 0, target: null, best: 0 };
+    cur.hits += sw.n;
+    if (sw.n > cur.best) { cur.best = sw.n; cur.target = sw.target; }
+    switches.set(k, cur);
+  }
+
+  const list = [...perCombo.entries()].map(([k, c]) => {
+    let h = 0;
+    for (const n of c.apps.values()) { const p = n / c.n; h -= p * Math.log2(p); }
+    const spread = scale ? h / scale : 0;
+    const sw = switches.get(k);
+    let verdict, cls;
+    if (sw && sw.hits > 0) { verdict = `全局 → ${sw.target}`; cls = "s1"; }
+    else if (c.apps.size >= 4 && spread >= 0.6) { verdict = "疑似全局"; cls = "s4"; }
+    else if (c.apps.size === 1) { verdict = "app 内"; cls = "s9"; }
+    else { verdict = "不确定"; cls = "s9"; }
+    return { ...c, spread, switches: sw ? sw.hits : 0, verdict, cls };
+  }).sort((a, b) => (b.switches > 0) - (a.switches > 0) || b.n - a.n).slice(0, 20);
+
+  el("globalNote").textContent = `切换命中 = 按键后 ${0.6}s 内前台 app 变化的次数 · 离散度 = app 分布熵 / log2(${appTotal})`;
+  el("globalTable").querySelector("tbody").innerHTML = list.length ? list.map(r => `<tr>
+      <td>${comboHTML(r.mods, r.key)}</td>
+      <td class="n">${fmt(r.n)}</td>
+      <td class="n">${r.apps.size}</td>
+      <td class="n">${r.spread.toFixed(2)}</td>
+      <td class="n">${r.switches || "—"}</td>
+      <td class="verdict"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--${r.cls});margin-right:6px"></span>${esc(r.verdict)}</td>
+    </tr>`).join("") : `<tr><td colspan="6" class="empty">无数据</td></tr>`;
+}
+
+function refreshSelects() {
+  const keep = (sel, v) => { if ([...sel.options].some(o => o.value === v)) sel.value = v; else sel.value = ""; };
+  fillSelect(el("fApp"), [...new Set(DATA.combos.map(r => r.app))], "全部 app", state.app);
+  fillSelect(el("fMods"), [...new Set(DATA.combos.map(r => r.mods || ""))]
+    .sort((a, b) => a.length - b.length), "全部修饰键", state.mods);
+  fillSelect(el("fTitle"), DATA.titles ? [...new Set(DATA.titles.map(r => r.title))] : [],
+    "全部标题", state.title);
+  keep(el("fApp"), state.app); keep(el("fMods"), state.mods); keep(el("fTitle"), state.title);
+  state.app = el("fApp").value; state.mods = el("fMods").value; state.title = el("fTitle").value;
+}
+
+function renderAll() {
   const m = DATA.meta;
   el("sub").textContent = `范围 ${m.since} · ${m.first_event || "—"} → ${m.last_event || "—"} · `
     + `${fmt(m.total)} 次按键 · ${fmt(m.combos)} 个组合键 · ${fmt(m.apps)} 个 app`;
+  refreshSelects();
+  render();
+  el("foot").innerHTML = API
+    ? `<span class="dot${state.paused ? " off" : ""}"></span>
+       <span>${state.paused ? "已暂停" : `每 ${POLL_MS / 1000}s 自动刷新`} · 更新于 ${
+         new Date().toLocaleTimeString()}</span>
+       <button id="pause">${state.paused ? "继续" : "暂停"}</button>`
+    : `<span>静态快照 · 数据来源 <code>~/.local/share/keystats/keystats.db</code> ·
+       实时看板：<code>keystats serve --open</code></span>`;
+  if (API) el("pause").onclick = () => { state.paused = !state.paused; renderAll(); };
+}
 
-  fillSelect(el("fApp"), uniqSorted(DATA.combos, "app"), "全部 app", state.app);
-  fillSelect(el("fTitle"), uniqSorted(DATA.titleCombos, "title").slice(0, 60), "全部标题", state.title);
-  fillSelect(el("fMods"), [...new Set(DATA.combos.map(r => r.mods || ""))]
-    .sort((a, b) => a.length - b.length), "全部修饰键", state.mods);
+let signature = "";
+async function load(force) {
+  if (!API) { renderAll(); return; }
+  try {
+    const q = new URLSearchParams({ since: state.since, titles: state.titles ? "1" : "0" });
+    const res = await fetch(`${API}?${q}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(await res.text());
+    const next = await res.json();
+    const sig = `${next.meta.total}|${next.meta.last_event}|${next.combos.length}|${state.titles}`;
+    if (!force && sig === signature) {  // nothing new; just move the clock on
+      el("foot").querySelector("span:last-of-type") && renderAll();
+      return;
+    }
+    signature = sig;
+    DATA = next;
+    renderAll();
+  } catch (err) {
+    el("foot").innerHTML = `<span class="dot off"></span><span>读取失败：${esc(err.message)}</span>`;
+  }
+}
 
-  el("bucketSeg").innerHTML = ["hour", "day", "week", "month"]
-    .map(b => `<button data-b="${b}" class="${b === state.bucket ? "on" : ""}">${
-      { hour: "小时", day: "天", week: "周", month: "月" }[b]}</button>`).join("");
-  el("bucketSeg").onclick = e => {
-    const b = e.target.dataset.b; if (!b) return;
-    state.bucket = b;
-    [...el("bucketSeg").children].forEach(c => c.classList.toggle("on", c.dataset.b === b));
-    render();
-  };
+function init() {
+  const dist = [["bar", "条形"], ["pie", "饼图"]];
+  const series = [["bar", "柱状"], ["line", "折线"]];
+  segment(el("bucketSeg"), Object.entries(BUCKET_CN), state.bucket, v => { state.bucket = v; render(); });
+  segment(el("dimSeg"), [["app", "仅 app"], ["title", "app + 标题"]],
+    state.titles ? "title" : "app", v => {
+      state.titles = v === "title";
+      if (!state.titles) state.title = "";
+      if (API) load(true); else renderAll();
+    });
+  segment(el("appSeg"), dist, state.chart.app, v => { state.chart.app = v; render(); });
+  segment(el("modSeg"), dist, state.chart.mod, v => { state.chart.mod = v; render(); });
+  segment(el("titleSeg"), dist, state.chart.title, v => { state.chart.title = v; render(); });
+  segment(el("hodSeg"), series, state.chart.hod, v => { state.chart.hod = v; render(); });
+  segment(el("trendSeg"), series, state.chart.trend, v => { state.chart.trend = v; render(); });
+
+  if (API) {
+    el("rangeCtrl").hidden = false;
+    fillSelect(el("fSince"), [], "", "");
+    el("fSince").innerHTML = SINCE_OPTS.map(([v, t]) =>
+      `<option value="${v}"${v === state.since ? " selected" : ""}>${t}</option>`).join("");
+    el("fSince").onchange = e => { state.since = e.target.value; load(true); };
+  }
 
   el("fApp").onchange   = e => { state.app = e.target.value; render(); };
   el("fTitle").onchange = e => { state.title = e.target.value; render(); };
   el("fMods").onchange  = e => { state.mods = e.target.value; render(); };
   el("reset").onclick = () => {
-    state.app = state.title = state.mods = "";
-    el("fApp").value = el("fTitle").value = el("fMods").value = "";
+    state.app = state.mods = state.title = "";
+    el("fApp").value = el("fMods").value = el("fTitle").value = "";
     render();
   };
-  render();
+
+  if (API) {
+    load(true);
+    setInterval(() => { if (!state.paused && !document.hidden) load(false); }, POLL_MS);
+  } else {
+    renderAll();
+  }
 }
 
-if (DATA && DATA.combos && DATA.combos.length) init();
+if (API || (DATA && DATA.combos && DATA.combos.length)) init();
 else document.querySelector(".wrap").innerHTML =
-  '<h1>Keystats</h1><div class="empty">该时间范围内没有数据。先让采集器跑一会儿，再运行 <code>keystats report</code>。</div>';
+  '<header><h1>Keystats</h1></header><div class="panel"><div class="empty">该时间范围内没有数据。'
+  + '先让采集器跑一会儿，再运行 <code>keystats report</code>，或用 <code>keystats serve</code> 看实时看板。</div></div>';
 </script>
 </body>
 </html>

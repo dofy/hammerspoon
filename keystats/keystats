@@ -64,6 +64,7 @@ sql_quote() { local v=${1-}; print -- "${v//\'/\'\'}" }
 parse_opts() {
   SINCE=${KEYSTATS_SINCE:-7d}; UNTIL=now; APP=; TITLE=; MODS=; KEY=
   BY=combo; ROWS=app; COLS=mods; BUCKET=day; LIMIT=20; OUT=; OPEN=0; FROMFILE=; OLDER=
+  TITLES=0; PORT=8787; HOST=127.0.0.1
   while (( $# )); do
     case $1 in
       --since)  SINCE=$2; shift 2 ;;
@@ -80,7 +81,10 @@ parse_opts() {
       --out)    OUT=$2;   shift 2 ;;
       --from)   FROMFILE=$2; shift 2 ;;
       --older-than) OLDER=$2; shift 2 ;;
+      --port)   PORT=$2; shift 2 ;;
+      --host)   HOST=$2; shift 2 ;;
       --open)   OPEN=1; shift ;;
+      --titles) TITLES=1; shift ;;
       -*) die "unknown option $1" ;;
       *)  die "unexpected argument $1" ;;
     esac
@@ -180,6 +184,64 @@ cmd_unused() {
   done < $FROMFILE
 }
 
+# A global hotkey is consumed before any app sees it, so the tap always credits
+# whoever was frontmost. Two pieces of evidence narrow it down: an app activation
+# recorded right after the keystroke (switch_to), and how evenly the combination
+# is spread over apps (normalised Shannon entropy — a per-app shortcut clusters
+# in one app, a global one shows up everywhere).
+cmd_global() {
+  parse_opts "$@"
+  local sym="replace(replace(replace(replace(replace(tot.mods,'ctrl','⌃'),'alt','⌥'),'shift','⇧'),'cmd','⌘'),'+','')"
+  $SQLITE -box "$DB" "
+    WITH ev AS (
+      SELECT e.mods AS mods, e.keycode AS keycode, e.app_id AS app_id, sum(e.n) AS n
+      $FROM WHERE $WHERE GROUP BY 1,2,3
+    ), tot AS (
+      SELECT mods, keycode, sum(n) AS total, count(*) AS apps FROM ev GROUP BY 1,2
+    ), ent AS (
+      SELECT ev.mods AS mods, ev.keycode AS keycode,
+             -sum((1.0*ev.n/tot.total) * log2(1.0*ev.n/tot.total)) AS h
+      FROM ev JOIN tot ON tot.mods = ev.mods AND tot.keycode = ev.keycode
+      GROUP BY 1,2
+    ), swx AS (
+      SELECT e.mods AS mods, e.keycode AS keycode, e.switch_to AS target_id, sum(e.n) AS n
+      FROM event e WHERE e.ts >= $TS_FROM AND e.ts <= $TS_TO AND e.switch_to IS NOT NULL
+      GROUP BY 1,2,3
+    ), sw AS (
+      SELECT mods, keycode, sum(n) AS hits,
+             (SELECT s.name FROM swx x2 JOIN app s ON s.id = x2.target_id
+              WHERE x2.mods = swx.mods AND x2.keycode = swx.keycode
+              ORDER BY x2.n DESC LIMIT 1) AS target
+      FROM swx GROUP BY mods, keycode
+    ), scale AS (SELECT max(2, count(DISTINCT e.app_id)) AS apps $FROM WHERE $WHERE)
+    SELECT $sym || (CASE WHEN length(k.name)=1 THEN upper(k.name) ELSE k.name END) AS combo,
+           tot.total AS n,
+           tot.apps  AS apps,
+           printf('%.2f', coalesce(ent.h,0) / log2(scale.apps)) AS spread,
+           coalesce(sw.hits,0) AS switches,
+           coalesce(sw.target,'—') AS target,
+           CASE
+             WHEN coalesce(sw.hits,0) > 0 THEN '全局 → ' || sw.target
+             WHEN tot.apps >= 4 AND coalesce(ent.h,0) / log2(scale.apps) >= 0.6 THEN '疑似全局'
+             WHEN tot.apps = 1 THEN 'app 内'
+             ELSE '不确定'
+           END AS verdict
+    FROM tot
+    JOIN ent   ON ent.mods = tot.mods AND ent.keycode = tot.keycode
+    LEFT JOIN sw ON sw.mods = tot.mods AND sw.keycode = tot.keycode
+    LEFT JOIN keyname k ON k.keycode = tot.keycode
+    CROSS JOIN scale
+    ORDER BY (coalesce(sw.hits,0) > 0) DESC, tot.total DESC
+    LIMIT $LIMIT;"
+}
+
+cmd_serve() {
+  parse_opts "$@"
+  print "keystats: live dashboard — Ctrl-C to stop"
+  if (( OPEN )); then (sleep 1 && open "http://$HOST:$PORT") & fi
+  exec /usr/bin/python3 "$SELF_DIR/server.py" --db "$DB" --template "$TEMPLATE" --host "$HOST" --port "$PORT"
+}
+
 cmd_prune() {
   parse_opts "$@"
   [[ -n $OLDER ]] || die "--older-than required, e.g. --older-than 90d"
@@ -206,7 +268,9 @@ cmd_report() {
   local out=${OUT:-${DB:h}/report.html}
   local tmp=$(mktemp -t keystats-data)
 
-  # Three bounded datasets; the page does all pivoting client-side.
+  # Bounded datasets; the page does all pivoting client-side. Window titles are
+  # an opt-in dimension (--titles), because they multiply the payload and the
+  # dashboard reports per app by default.
   {
     print -n '{"meta":'
     $SQLITE -json "$DB" "
@@ -225,12 +289,19 @@ cmd_report() {
     $SQLITE -json "$DB" "
       SELECT (e.ts/3600)*3600 AS h, a.name AS app, sum(e.n) AS n
       $FROM WHERE $WHERE GROUP BY 1,2 ORDER BY 1"
-    print -n ',"titleCombos":'
+    print -n ',"switches":'
     $SQLITE -json "$DB" "
-      WITH top AS (SELECT t.id FROM event e JOIN title t ON t.id=e.title_id
-                   WHERE $WHERE GROUP BY t.id ORDER BY sum(e.n) DESC LIMIT 40)
-      SELECT a.name AS app, t.norm AS title, e.mods AS mods, k.name AS key, sum(e.n) AS n
-      $FROM WHERE $WHERE AND t.id IN (SELECT id FROM top) GROUP BY 1,2,3,4 ORDER BY n DESC"
+      SELECT e.mods AS mods, k.name AS key, s.name AS target, sum(e.n) AS n
+      $FROM JOIN app s ON s.id = e.switch_to
+      WHERE $WHERE GROUP BY 1,2,3 ORDER BY n DESC"
+    if (( TITLES )); then
+      print -n ',"titles":'
+      $SQLITE -json "$DB" "
+        WITH top AS (SELECT t.id FROM event e JOIN title t ON t.id=e.title_id
+                     WHERE $WHERE GROUP BY t.id ORDER BY sum(e.n) DESC LIMIT 60)
+        SELECT a.name AS app, t.norm AS title, e.mods AS mods, k.name AS key, sum(e.n) AS n
+        $FROM WHERE $WHERE AND t.id IN (SELECT id FROM top) GROUP BY 1,2,3,4 ORDER BY n DESC"
+    fi
     print -n '}'
   } > $tmp
 
@@ -259,9 +330,15 @@ keystats — shortcut usage statistics
   keystats apps   [--since 7d] [--limit N]
   keystats titles [--app X] [--since 7d] [--limit N]
   keystats unused --from FILE [--since 30d]
-  keystats report [--since 30d] [--out FILE] [--open]
+  keystats global [--since 30d] [--limit N]
+  keystats serve  [--port 8787] [--open]
+  keystats report [--since 30d] [--titles] [--out FILE] [--open]
   keystats sql    "SELECT ..."
   keystats prune  --older-than 90d
+
+`serve` is the live dashboard: it polls the database, so the numbers keep moving.
+`report` writes a static snapshot of the same page. `--titles` adds the window
+title dimension to either one.
 
 Filters accepted by every query command: --since --until --app --title --mods --key
 Time values: all | today | yesterday | now | 7d | 24h | 90m | 4w | 3mo | YYYY-MM-DD
@@ -279,6 +356,8 @@ case $cmd in
   titles) cmd_titles "$@" ;;
   unused) cmd_unused "$@" ;;
   report) cmd_report "$@" ;;
+  global) cmd_global "$@" ;;
+  serve)  cmd_serve "$@" ;;
   prune)  cmd_prune "$@" ;;
   sql)    cmd_sql "$@" ;;
   help|-h|--help) usage ;;
