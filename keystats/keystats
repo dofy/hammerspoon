@@ -42,35 +42,32 @@ dim_expr() {
     mods)      print "CASE WHEN e.mods='' THEN '(none)' ELSE $MODSYM END" ;;
     app)       print "a.name" ;;
     bundle)    print "a.bundle_id" ;;
-    title)     print "coalesce(t.norm,'(no title)')" ;;
     hour)      print "strftime('%Y-%m-%d %H:00', e.ts,$LOCAL)" ;;
     day)       print "strftime('%Y-%m-%d', e.ts,$LOCAL)" ;;
     week)      print "strftime('%Y-W%W', e.ts,$LOCAL)" ;;
     month)     print "strftime('%Y-%m', e.ts,$LOCAL)" ;;
     dow)       print "strftime('%w', e.ts,$LOCAL)" ;;
     hourofday) print "strftime('%H', e.ts,$LOCAL)" ;;
-    *) die "unknown dimension '$1' (combo key mods app bundle title hour day week month dow hourofday)" ;;
+    *) die "unknown dimension '$1' (combo key mods app bundle hour day week month dow hourofday)" ;;
   esac
 }
 
 FROM="FROM event e
-      JOIN app a       ON a.id = e.app_id
-      LEFT JOIN title t ON t.id = e.title_id
+      JOIN app a          ON a.id = e.app_id
       LEFT JOIN keyname k ON k.keycode = e.keycode"
 
 # --- shared option parsing --------------------------------------------------
 sql_quote() { local v=${1-}; print -- "${v//\'/\'\'}" }
 
 parse_opts() {
-  SINCE=${KEYSTATS_SINCE:-7d}; UNTIL=now; APP=; TITLE=; MODS=; KEY=
+  SINCE=${KEYSTATS_SINCE:-7d}; UNTIL=now; APP=; MODS=; KEY=
   BY=combo; ROWS=app; COLS=mods; BUCKET=day; LIMIT=20; OUT=; OPEN=0; FROMFILE=; OLDER=
-  TITLES=0; PORT=8787; HOST=127.0.0.1
+  PORT=8787; HOST=127.0.0.1
   while (( $# )); do
     case $1 in
       --since)  SINCE=$2; shift 2 ;;
       --until)  UNTIL=$2; shift 2 ;;
       --app)    APP=$2;   shift 2 ;;
-      --title)  TITLE=$2; shift 2 ;;
       --mods)   MODS=$2;  shift 2 ;;
       --key)    KEY=$2;   shift 2 ;;
       --by)     BY=$2;    shift 2 ;;
@@ -84,7 +81,6 @@ parse_opts() {
       --port)   PORT=$2; shift 2 ;;
       --host)   HOST=$2; shift 2 ;;
       --open)   OPEN=1; shift ;;
-      --titles) TITLES=1; shift ;;
       -*) die "unknown option $1" ;;
       *)  die "unexpected argument $1" ;;
     esac
@@ -92,7 +88,6 @@ parse_opts() {
   TS_FROM=$(epoch_of $SINCE); TS_TO=$(epoch_of $UNTIL)
   WHERE="e.ts >= $TS_FROM AND e.ts <= $TS_TO"
   if [[ -n $APP   ]]; then WHERE+=" AND (a.name LIKE '%$(sql_quote "$APP")%' OR a.bundle_id LIKE '%$(sql_quote "$APP")%')"; fi
-  if [[ -n $TITLE ]]; then WHERE+=" AND t.norm LIKE '%$(sql_quote "$TITLE")%'"; fi
   if [[ -n $MODS  ]]; then WHERE+=" AND e.mods = '$(sql_quote "$MODS")'"; fi
   if [[ -n $KEY   ]]; then WHERE+=" AND k.name = '$(sql_quote "$KEY")'"; fi
   return 0
@@ -104,7 +99,6 @@ cmd_status() {
     SELECT (SELECT count(*) FROM event)                                   AS event_rows,
            (SELECT coalesce(sum(n),0) FROM event)                         AS keypresses,
            (SELECT count(*) FROM app)                                     AS apps,
-           (SELECT count(*) FROM title)                                   AS titles,
            (SELECT strftime('%Y-%m-%d %H:%M', min(ts),$LOCAL) FROM event) AS first_event,
            (SELECT strftime('%Y-%m-%d %H:%M', max(ts),$LOCAL) FROM event) AS last_event;"
   print "db: $DB  ($(du -h "$DB" | cut -f1))"
@@ -161,13 +155,6 @@ cmd_time() {
 }
 
 cmd_apps()   { parse_opts "$@"; BY=app;   cmd_top --since $SINCE --until $UNTIL --by app   --limit $LIMIT }
-cmd_titles() {
-  parse_opts "$@"
-  $SQLITE -box "$DB" "
-    SELECT a.name AS app, substr(coalesce(t.norm,'(no title)'),1,60) AS title, sum(e.n) AS n
-    $FROM WHERE $WHERE GROUP BY a.name, t.norm ORDER BY n DESC LIMIT $LIMIT;"
-}
-
 # Combos listed in FILE that were never used in the range — one combo per line,
 # written the way the database stores modifiers: cmd+shift+p
 cmd_unused() {
@@ -256,15 +243,14 @@ cmd_prune() {
   parse_opts "$@"
   [[ -n $OLDER ]] || die "--older-than required, e.g. --older-than 90d"
   local cut=$(epoch_of $OLDER)
-  print "rolling up events before $(date -r $cut '+%Y-%m-%d %H:%M') to hour granularity (window titles dropped)"
+  print "rolling up events before $(date -r $cut '+%Y-%m-%d %H:%M') to hour granularity"
   $SQLITE "$DB" "
     BEGIN IMMEDIATE;
     CREATE TEMP TABLE rolled AS
-      SELECT (ts/3600)*3600 AS ts, app_id, NULL AS title_id, mods, keycode, sum(n) AS n
-      FROM event WHERE ts < $cut GROUP BY 1,2,4,5;
+      SELECT (ts/3600)*3600 AS ts, app_id, mods, keycode, sum(n) AS n
+      FROM event WHERE ts < $cut GROUP BY 1,2,3,4;
     DELETE FROM event WHERE ts < $cut;
-    INSERT INTO event(ts,app_id,title_id,mods,keycode,n) SELECT ts,app_id,title_id,mods,keycode,n FROM rolled;
-    DELETE FROM title WHERE id NOT IN (SELECT title_id FROM event WHERE title_id IS NOT NULL);
+    INSERT INTO event(ts,app_id,mods,keycode,n) SELECT ts,app_id,mods,keycode,n FROM rolled;
     COMMIT;
     VACUUM;"
   cmd_status
@@ -278,9 +264,7 @@ cmd_report() {
   local out=${OUT:-${DB:h}/report.html}
   local tmp=$(mktemp -t keystats-data)
 
-  # Bounded datasets; the page does all pivoting client-side. Window titles are
-  # an opt-in dimension (--titles), because they multiply the payload and the
-  # dashboard reports per app by default.
+  # Bounded datasets; the page does all pivoting client-side.
   {
     print -n '{"meta":'
     $SQLITE -json "$DB" "
@@ -304,14 +288,6 @@ cmd_report() {
       SELECT e.mods AS mods, k.name AS key, s.name AS target, sum(e.n) AS n
       $FROM JOIN app s ON s.id = e.switch_to
       WHERE $WHERE GROUP BY 1,2,3 ORDER BY n DESC"
-    if (( TITLES )); then
-      print -n ',"titles":'
-      $SQLITE -json "$DB" "
-        WITH top AS (SELECT t.id FROM event e JOIN title t ON t.id=e.title_id
-                     WHERE $WHERE GROUP BY t.id ORDER BY sum(e.n) DESC LIMIT 60)
-        SELECT a.name AS app, t.norm AS title, e.mods AS mods, k.name AS key, sum(e.n) AS n
-        $FROM WHERE $WHERE AND t.id IN (SELECT id FROM top) GROUP BY 1,2,3,4 ORDER BY n DESC"
-    fi
     print -n '}'
   } > $tmp
 
@@ -334,25 +310,23 @@ usage() {
 keystats — shortcut usage statistics
 
   keystats status
-  keystats top    [--by combo|key|mods|app|title|day|hour|dow] [--since 7d] [--app X] [--limit N]
+  keystats top    [--by combo|key|mods|app|day|hour|dow] [--since 7d] [--app X] [--limit N]
   keystats pivot  --rows <dim> --cols <dim> [--since 30d] [--limit N]
   keystats time   [--bucket hour|day|week|month|dow|hourofday] [--since 30d] [--app X]
   keystats apps   [--since 7d] [--limit N]
-  keystats titles [--app X] [--since 7d] [--limit N]
   keystats unused --from FILE [--since 30d]
   keystats global [--since 30d] [--limit N]
   keystats serve  [--port 8787] [--open]
-  keystats report [--since 30d] [--titles] [--out FILE] [--open]
+  keystats report [--since 30d] [--out FILE] [--open]
   keystats sql    "SELECT ..."
   keystats prune  --older-than 90d
 
 `serve` is the live dashboard: it polls the database, so the numbers keep moving.
-`report` writes a static snapshot of the same page. `--titles` adds the window
-title dimension to either one.
+`report` writes a static snapshot of the same page.
 
-Filters accepted by every query command: --since --until --app --title --mods --key
+Filters accepted by every query command: --since --until --app --mods --key
 Time values: all | today | yesterday | now | 7d | 24h | 90m | 4w | 3mo | YYYY-MM-DD
-Dimensions:  combo key mods app bundle title hour day week month dow hourofday
+Dimensions:  combo key mods app bundle hour day week month dow hourofday
 EOF
 }
 
@@ -363,7 +337,6 @@ case $cmd in
   pivot)  cmd_pivot "$@" ;;
   time)   cmd_time "$@" ;;
   apps)   cmd_apps "$@" ;;
-  titles) cmd_titles "$@" ;;
   unused) cmd_unused "$@" ;;
   report) cmd_report "$@" ;;
   global) cmd_global "$@" ;;

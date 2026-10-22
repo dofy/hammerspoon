@@ -33,8 +33,9 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
   a switcher rather than a launcher.
   `keystats/server.py` serves the dashboard live over loopback; `keystats/report.html` is shared
   by the server and by static `keystats report` output through two markers it substitutes. The callback makes **no** OS calls: the frontmost
-  app comes from an `hs.application.watcher` and the window title from an `hs.window.filter`
-  subscription, because fetching an AX title in the hot path adds typing latency. A watchdog
+  app comes from an `hs.application.watcher`, because reading it in the hot path adds typing
+  latency. Window titles were collected until 2026-10-22 and removed as noise; `start()` still
+  drops `event.title_id` and the `title` table from older databases. A watchdog
   timer restarts the tap, since macOS silently disables a tap it considers slow. Modifier
   strings are normalised to `ctrl+alt+shift+cmd` order and the `fn` flag is dropped (macOS sets
   it on every arrow and function key). Query the database with `keystats/keystats`, a zsh CLI

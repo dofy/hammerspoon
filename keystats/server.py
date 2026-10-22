@@ -26,7 +26,6 @@ KEY_LABEL = "CASE WHEN length(k.name)=1 THEN upper(k.name) ELSE k.name END"
 FROM = """
   FROM event e
   JOIN app a ON a.id = e.app_id
-  LEFT JOIN title t ON t.id = e.title_id
   LEFT JOIN keyname k ON k.keycode = e.keycode
 """
 
@@ -66,7 +65,7 @@ def rows(con, sql, params=()):
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
-def payload(con, since: str, with_titles: bool) -> dict:
+def payload(con, since: str) -> dict:
     ts_from, ts_to = epoch_of(since), int(time.time())
     where = "e.ts >= ? AND e.ts <= ?"
     p = (ts_from, ts_to)
@@ -94,14 +93,6 @@ def payload(con, since: str, with_titles: bool) -> dict:
             {FROM} JOIN app s ON s.id = e.switch_to
             WHERE {where} GROUP BY 1, 2, 3 ORDER BY n DESC""", p),
     }
-    if with_titles:
-        data["titles"] = rows(con, f"""
-            WITH top AS (
-                SELECT t.id FROM event e JOIN title t ON t.id = e.title_id
-                WHERE {where} GROUP BY t.id ORDER BY sum(e.n) DESC LIMIT 60)
-            SELECT a.name AS app, t.norm AS title, e.mods AS mods, k.name AS key, sum(e.n) AS n
-            {FROM} WHERE {where} AND t.id IN (SELECT id FROM top)
-            GROUP BY 1, 2, 3, 4 ORDER BY n DESC""", (*p, *p))
     return data
 
 
@@ -131,11 +122,10 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/stats":
             q = parse_qs(url.query)
             since = (q.get("since") or ["7d"])[0]
-            titles = (q.get("titles") or ["0"])[0] == "1"
             try:
                 con = sqlite3.connect(f"file:{self.server.db}?mode=ro", uri=True)
                 try:
-                    body = json.dumps(payload(con, since, titles)).encode("utf-8")
+                    body = json.dumps(payload(con, since)).encode("utf-8")
                 finally:
                     con.close()
             except ValueError as exc:

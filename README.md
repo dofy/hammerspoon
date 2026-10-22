@@ -5,7 +5,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 ## Features
 
 - **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
-- **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application and the window title, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
+- **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
 - **Battery info** (`test.lua`) — an on-demand diagnostic that prints detailed battery stats (health, cycles, capacity, voltage…) to the Hammerspoon Console. Run `require("test").test()` in the Console.
 - **Manual reload** — press `⌘ + ⌥ + ⌃ + R` to reload the config at any time.
 - **Auto reload** — saving any `.lua` file under `~/.hammerspoon/` reloads the config automatically.
@@ -47,10 +47,8 @@ ln -s ~/.hammerspoon/keystats/keystats ~/.local/bin/keystats
 keystats serve --open                              # live dashboard, polls every 5s
 keystats status                                    # rows, date range, db size
 keystats top --since 7d --app Cursor                # most used shortcuts in one app
-keystats top --by title --since 30d                 # which documents drive the keystrokes
 keystats pivot --rows app --cols mods --since 30d   # any two dimensions crossed
 keystats time --bucket hourofday                    # when during the day you press them
-keystats titles --app Ghostty                       # busiest window titles
 keystats unused --from combos.txt --since 30d       # bindings you configured but never pressed
 keystats global --since 30d                         # global hotkey vs in-app shortcut
 keystats report --since 30d --open                  # static snapshot of the dashboard
@@ -58,10 +56,10 @@ keystats sql "SELECT ..."                           # escape hatch
 keystats prune --older-than 90d                     # roll old events up to the hour
 ```
 
-Every query command accepts `--since` / `--until` / `--app` / `--title` / `--mods` / `--key`.
+Every query command accepts `--since` / `--until` / `--app` / `--mods` / `--key`.
 Time values are `all`, `today`, `yesterday`, `7d`, `24h`, `90m`, `4w`, `3mo` or `YYYY-MM-DD`;
-dimensions are `combo`, `key`, `mods`, `app`, `bundle`, `title`, `hour`, `day`, `week`, `month`,
-`dow` and `hourofday`.
+dimensions are `combo`, `key`, `mods`, `app`, `bundle`, `hour`, `day`, `week`, `month`, `dow`
+and `hourofday`.
 
 ### The dashboard
 
@@ -74,12 +72,15 @@ binds to loopback on purpose — this database is a record of every shortcut you
 sharing. Both carry a keyboard heatmap, the top combinations, the per-app and per-modifier split
 (each switchable between bars and a donut), a time-of-day histogram and a trend chart (bars or a
 line), a global-vs-in-app verdict table, and a combination × app detail table. Everything
-re-pivots client-side from the app, modifier, granularity and dimension selectors.
+re-pivots client-side from the app and modifier selectors.
 
-The **统计维度 / dimension** switch turns the window-title dimension on and off: `app` keeps the
-report per application, `app + 标题` adds the title filter, a title distribution panel and a
-title column in the detail table. The live server fetches titles on demand; a static report
-needs `keystats report --titles` for the switch to have data.
+Window titles were collected until 2026-10-22 and then dropped: in the apps that carry the most
+shortcuts the title was a constant (`微信`, `飞书`) and added nothing to the app name, while the
+apps with many titles — a browser, a chat client — contributed a fresh row per page, 45% of them
+seen exactly once. The dimension cost a filter, a panel, a detail column and an API branch, and
+it was the only thing in the database recording *what* was on screen rather than which keys were
+pressed. Per-project context, if it is ever wanted, belongs in a low-cardinality field derived at
+collection time (a repository or session name parsed out of the title), not in the raw title.
 
 ### Global hotkey or in-app shortcut?
 
@@ -111,7 +112,8 @@ Raycast's panel, which does not take activation.
 A keystroke is recorded only when it carries ⌘, ⌥ or ⌃. Shift alone is capitalisation, so it
 counts only as a co-modifier, and a bare arrow key, Escape or function key is navigation rather
 than a shortcut (`config.includeBareSpecialKeys` turns those back on). Plain character keys are
-never recorded unless `config.includePlainKeys` is set, so the database holds no typed text.
+never recorded unless `config.includePlainKeys` is set, so the database holds no typed text and
+no window titles.
 
 Real hotkeys that live on Shift alone are named individually in `config.alwaysRecord`, which
 ships with Raycast's `shift+space`. Write the key the way this module spells it: modifiers in
@@ -125,7 +127,7 @@ or a terminal with Secure Keyboard Entry enabled) — those keystrokes never rea
 
 Events are buffered in memory and flushed in one transaction every five seconds. Roughly 5k
 events a day cost about 60 MB a year, so `keystats prune --older-than 90d` rolls older events up
-to hour granularity and drops their window titles. The database lives outside this repository,
+to hour granularity. The database lives outside this repository,
 under `~/.local/share/keystats/`, and is never committed.
 
 ## Configuration

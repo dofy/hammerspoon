@@ -1,14 +1,13 @@
 --- === keystats ===
 ---
---- Records modifier-bearing keystrokes (and special keys) together with the
---- frontmost application and window title, so shortcut usage can be analysed
---- later with the `keystats` CLI.
+--- Records modifier-bearing keystrokes together with the frontmost
+--- application, so shortcut usage can be analysed later with the `keystats`
+--- CLI.
 ---
 --- Design notes:
 ---  * The keyDown callback performs no OS calls. The frontmost app is kept up
----    to date by an `hs.application.watcher`, and the window title by an
----    `hs.window.filter` subscription. Fetching an AX title inside the hot path
----    would add perceptible typing latency.
+---    to date by an `hs.application.watcher`; reading it (or an AX window
+---    title) inside the hot path would add perceptible typing latency.
 ---  * Events are buffered in memory and flushed to SQLite in a single
 ---    transaction every `config.flushInterval` seconds. Identical events inside
 ---    one flush window collapse into a single row with a count.
@@ -23,7 +22,6 @@ M.config = {
     dbPath = os.getenv("HOME") .. "/.local/share/keystats/keystats.db",
     flushInterval = 5,
     watchdogInterval = 60,
-    recordTitles = true,
     -- Record plain character keys too. This turns the module into a full
     -- keylogger (passwords included, outside secure input fields), so it is
     -- off by default; shortcut statistics do not need it.
@@ -64,14 +62,13 @@ local SPECIAL_KEY_NAMES = {
     "f11", "f12", "f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20",
 }
 
-local tap, flushTimer, watchdogTimer, appWatcher, winFilter
+local tap, flushTimer, watchdogTimer, appWatcher
 local db, stmts
 local buffer, bufferCount = {}, 0
-local appCache, titleCache = {}, {}
+local appCache = {}
 local specialKeys = {}
 local keyNames = {}
 local currentApp = { bundle = "unknown", name = "unknown" }
-local currentTitle = nil
 local lastKey = nil
 local lastQuit = nil
 local lastMark = nil
@@ -91,18 +88,9 @@ CREATE TABLE IF NOT EXISTS app (
     name      TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS title (
-    id     INTEGER PRIMARY KEY,
-    app_id INTEGER NOT NULL REFERENCES app(id),
-    raw    TEXT NOT NULL,
-    norm   TEXT NOT NULL,
-    UNIQUE (app_id, raw)
-);
-
 CREATE TABLE IF NOT EXISTS event (
     ts        INTEGER NOT NULL,
     app_id    INTEGER NOT NULL REFERENCES app(id),
-    title_id  INTEGER REFERENCES title(id),
     mods      TEXT NOT NULL,
     keycode   INTEGER NOT NULL,
     n         INTEGER NOT NULL DEFAULT 1,
@@ -117,7 +105,6 @@ CREATE TABLE IF NOT EXISTS keyname (
 CREATE INDEX IF NOT EXISTS event_ts     ON event(ts);
 CREATE INDEX IF NOT EXISTS event_app_ts ON event(app_id, ts);
 CREATE INDEX IF NOT EXISTS event_combo  ON event(mods, keycode);
-CREATE INDEX IF NOT EXISTS title_app    ON title(app_id);
 ]]
 
 -- Created after the switch_to migration, never inside SCHEMA: on a database
@@ -141,20 +128,6 @@ local function modsString(f)
     return table.concat(parts, "+")
 end
 
--- Strip the volatile parts of a window title so the same document does not
--- produce a new row every time an unread badge changes.
-local function normTitle(t)
-    if not t then return nil end
-    local s = t
-    s = s:gsub("^%s*[%(%[]%d+[%)%]]%s*", "")   -- (3) foo
-    s = s:gsub("^[%*]%s+", "")                 -- "* unsaved.txt"
-    s = s:gsub("^[●•○◉‣]%s*", "")              -- unread / modified dots
-    s = s:gsub("^%s+", ""):gsub("%s+$", "")
-    s = s:gsub("%s+", " ")
-    if s == "" then return nil end
-    return s
-end
-
 local function appId(bundle, name)
     local id = appCache[bundle]
     if id then return id end
@@ -168,21 +141,6 @@ local function appId(bundle, name)
     return id
 end
 
-local function titleId(aid, bundle, raw)
-    if not raw then return nil end
-    local ck = bundle .. "\0" .. raw
-    local id = titleCache[ck]
-    if id then return id end
-    stmts.insTitle:bind_values(aid, raw, normTitle(raw) or raw)
-    stmts.insTitle:step()
-    stmts.insTitle:reset()
-    stmts.selTitle:bind_values(aid, raw)
-    if stmts.selTitle:step() == sqlite3.ROW then id = stmts.selTitle:get_value(0) end
-    stmts.selTitle:reset()
-    titleCache[ck] = id
-    return id
-end
-
 -- Flush ----------------------------------------------------------------
 
 local function flush()
@@ -193,9 +151,8 @@ local function flush()
     db:exec("BEGIN IMMEDIATE")
     for _, row in pairs(pending) do
         local aid = appId(row.bundle, row.name)
-        local tid = titleId(aid, row.bundle, row.title)
         local sid = row.switchTo and appId(row.switchTo, row.switchName or row.switchTo) or nil
-        stmts.insEvent:bind_values(row.ts, aid, tid, row.mods, row.keycode, row.n, sid)
+        stmts.insEvent:bind_values(row.ts, aid, row.mods, row.keycode, row.n, sid)
         stmts.insEvent:step()
         stmts.insEvent:reset()
     end
@@ -240,9 +197,8 @@ local function onKey(e)
     local bundle = currentApp.bundle
     if M.config.excludeApps[bundle] then return false end
 
-    local title = M.config.recordTitles and currentTitle or nil
     local ts = os.time()
-    local k = ts .. "\0" .. bundle .. "\0" .. (title or "") .. "\0" .. mods .. "\0" .. keycode
+    local k = ts .. "\0" .. bundle .. "\0" .. mods .. "\0" .. keycode
 
     local row = buffer[k]
     if row then
@@ -250,7 +206,7 @@ local function onKey(e)
     else
         buffer[k] = {
             ts = ts, bundle = bundle, name = currentApp.name,
-            title = title, mods = mods, keycode = keycode, n = 1,
+            mods = mods, keycode = keycode, n = 1,
         }
         bufferCount = bufferCount + 1
     end
@@ -289,21 +245,21 @@ local function markSwitch(toBundle, toName)
         bufferCount = bufferCount - 1
     end
 
-    local sk = row.ts .. "\0" .. row.bundle .. "\0" .. (row.title or "") .. "\0"
-        .. row.mods .. "\0" .. row.keycode .. "\0SW\0" .. toBundle
+    local sk = row.ts .. "\0" .. row.bundle .. "\0" .. row.mods .. "\0"
+        .. row.keycode .. "\0SW\0" .. toBundle
     local srow = buffer[sk]
     if srow then
         srow.n = srow.n + 1
     else
         buffer[sk] = {
-            ts = row.ts, bundle = row.bundle, name = row.name, title = row.title,
+            ts = row.ts, bundle = row.bundle, name = row.name,
             mods = row.mods, keycode = row.keycode, n = 1,
             switchTo = toBundle, switchName = toName,
         }
         bufferCount = bufferCount + 1
     end
     lastMark = { skey = sk, bkey = bkey, at = hs.timer.secondsSinceEpoch(),
-                 bundle = row.bundle, name = row.name, ts = row.ts, title = row.title,
+                 bundle = row.bundle, name = row.name, ts = row.ts,
                  mods = row.mods, keycode = row.keycode }
 end
 
@@ -334,7 +290,7 @@ local function unmarkSwitch(bundle, name)
         else
             buffer[lastMark.bkey] = {
                 ts = lastMark.ts, bundle = lastMark.bundle, name = lastMark.name,
-                title = lastMark.title, mods = lastMark.mods, keycode = lastMark.keycode, n = 1,
+                mods = lastMark.mods, keycode = lastMark.keycode, n = 1,
             }
             bufferCount = bufferCount + 1
         end
@@ -346,12 +302,6 @@ local function unmarkSwitch(bundle, name)
 end
 
 -- Context tracking -----------------------------------------------------
-
-local function refreshTitle(win)
-    if not M.config.recordTitles then return end
-    local ok, t = pcall(function() return win and win:title() end)
-    currentTitle = (ok and t ~= "" and t) or nil
-end
 
 local function onAppEvent(name, event, app)
     if event == hs.application.watcher.terminated then
@@ -368,7 +318,6 @@ local function onAppEvent(name, event, app)
         -- Mark before switching context: markSwitch reads the buffered row.
         markSwitch(bundle, name or bundle)
         currentApp = { bundle = bundle, name = name or "unknown" }
-        refreshTitle(app:focusedWindow())
     end
 end
 
@@ -391,6 +340,22 @@ function M.start()
         return M
     end
 
+    -- Migrate databases that still carry the dropped window-title dimension.
+    local hasTitleCol = false
+    for row in db:nrows("PRAGMA table_info(event)") do
+        if row.name == "title_id" then hasTitleCol = true end
+    end
+    if hasTitleCol then
+        if db:exec("ALTER TABLE event DROP COLUMN title_id") == sqlite3.OK then
+            log.i("migrated: dropped event.title_id")
+        else
+            log.ef("dropping event.title_id failed: %s", db:errmsg())
+        end
+    end
+    if db:exec("DROP TABLE IF EXISTS title") ~= sqlite3.OK then
+        log.ef("dropping the title table failed: %s", db:errmsg())
+    end
+
     -- Migrate databases created before switch_to existed.
     local hasSwitch = false
     for row in db:nrows("PRAGMA table_info(event)") do
@@ -410,9 +375,7 @@ function M.start()
     stmts = {
         insApp   = db:prepare("INSERT OR IGNORE INTO app(bundle_id, name) VALUES (?, ?)"),
         selApp   = db:prepare("SELECT id FROM app WHERE bundle_id = ?"),
-        insTitle = db:prepare("INSERT OR IGNORE INTO title(app_id, raw, norm) VALUES (?, ?, ?)"),
-        selTitle = db:prepare("SELECT id FROM title WHERE app_id = ? AND raw = ?"),
-        insEvent = db:prepare("INSERT INTO event(ts, app_id, title_id, mods, keycode, n, switch_to) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+        insEvent = db:prepare("INSERT INTO event(ts, app_id, mods, keycode, n, switch_to) VALUES (?, ?, ?, ?, ?, ?)"),
     }
 
     -- Refresh the keycode -> name map for the current layout, preferring the
@@ -441,16 +404,9 @@ function M.start()
     local front = hs.application.frontmostApplication()
     if front then
         currentApp = { bundle = front:bundleID() or front:name(), name = front:name() }
-        refreshTitle(front:focusedWindow())
     end
 
     appWatcher = hs.application.watcher.new(onAppEvent):start()
-
-    winFilter = hs.window.filter.new(nil)
-    winFilter:subscribe({
-        hs.window.filter.windowFocused,
-        hs.window.filter.windowTitleChanged,
-    }, function(win) refreshTitle(win) end)
 
     tap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, onKey):start()
 
@@ -477,7 +433,6 @@ function M.stop()
     if flushTimer then flushTimer:stop(); flushTimer = nil end
     if watchdogTimer then watchdogTimer:stop(); watchdogTimer = nil end
     if appWatcher then appWatcher:stop(); appWatcher = nil end
-    if winFilter then winFilter:unsubscribeAll(); winFilter = nil end
     if db then
         flush()
         for _, s in pairs(stmts or {}) do s:finalize() end
@@ -485,7 +440,7 @@ function M.stop()
         db:close()
         db = nil
     end
-    appCache, titleCache = {}, {}
+    appCache = {}
     buffer, bufferCount = {}, 0
     lastKey, lastQuit, lastMark = nil, nil, nil
     return M

@@ -77,7 +77,6 @@ select, button {
 }
 select { appearance: none; -webkit-appearance: none; width: 100%; padding-right: 34px; text-overflow: ellipsis; }
 #fApp   { min-width: 180px; max-width: 220px; }
-#fTitle { min-width: 180px; max-width: 240px; }
 #fMods  { min-width: 140px; max-width: 170px; }
 #fSince { min-width: 110px; max-width: 130px; }
 button { cursor: pointer; padding: 7px 14px; }
@@ -175,10 +174,7 @@ footer code { color: var(--muted); }
     <div class="ctrl" id="rangeCtrl" hidden><span class="ctrl-k">时间范围</span>
       <span class="sel"><select id="fSince"></select></span></div>
     <div class="ctrl"><span class="ctrl-k">App</span><span class="sel"><select id="fApp"></select></span></div>
-    <div class="ctrl" id="titleCtrl" hidden><span class="ctrl-k">窗口标题</span>
-      <span class="sel"><select id="fTitle"></select></span></div>
     <div class="ctrl"><span class="ctrl-k">修饰键</span><span class="sel"><select id="fMods"></select></span></div>
-    <div class="ctrl"><span class="ctrl-k">统计维度</span><span class="seg" id="dimSeg"></span></div>
     <div class="ctrl"><span class="ctrl-k" aria-hidden="true">&nbsp;</span><button id="reset">重置</button></div>
   </div>
 
@@ -213,11 +209,6 @@ footer code { color: var(--muted); }
         <div id="modDist"></div>
       </div>
     </div>
-  </div>
-
-  <div class="panel" id="titlePanel" hidden>
-    <h2>窗口标题分布 <span class="scope">Top 60</span><span class="seg sm" id="titleSeg"></span></h2>
-    <div id="titleDist"></div>
   </div>
 
   <div class="panel">
@@ -299,16 +290,13 @@ const SINCE_OPTS = [["today", "今天"], ["2d", "48 小时"], ["7d", "7 天"], [
                     ["3mo", "3 个月"], ["all", "全部"]];
 
 const state = {
-  app: "", title: "", mods: "", bucket: "day", since: "7d", titles: false, paused: false,
-  chart: { app: "bar", mod: "bar", title: "bar", hod: "bar", trend: "bar" },
+  app: "", mods: "", bucket: "day", since: "7d", paused: false,
+  chart: { app: "bar", mod: "bar", hod: "bar", trend: "bar" },
 };
 
-// With the title dimension on, the title dataset is the finer-grained source;
-// it only covers the top titles, so it is used only when a title is selected.
 function activeRows() {
-  let rows = (state.titles && state.title && DATA.titles) ? DATA.titles : DATA.combos;
+  let rows = DATA.combos;
   if (state.app) rows = rows.filter(r => r.app === state.app);
-  if (state.title && rows !== DATA.combos) rows = rows.filter(r => r.title === state.title);
   if (state.mods !== "") rows = rows.filter(r => (r.mods || "") === state.mods);
   return rows;
 }
@@ -499,34 +487,15 @@ function render() {
     (b, i, len) => (i % Math.ceil(len / 12) === 0 ? b.label.slice(5) : ""));
   el("trendScope").textContent = `按${BUCKET_CN[state.bucket]}` + (state.app ? ` · ${state.app}` : "");
 
-  const showTitles = state.titles && Array.isArray(DATA.titles) && DATA.titles.length > 0;
-  el("titlePanel").hidden = !showTitles;
-  el("titleCtrl").hidden = !showTitles;
-  if (!showTitles) {
-    el("titleDist").innerHTML = "";   // never leave the previous dimension's rows behind
-  } else {
-    const titleMap = new Map();
-    for (const r of DATA.titles) {
-      if (state.app && r.app !== state.app) continue;
-      if (state.mods !== "" && (r.mods || "") !== state.mods) continue;
-      titleMap.set(r.title, (titleMap.get(r.title) || 0) + r.n);
-    }
-    drawDist(el("titleDist"), state.chart.title,
-      [...titleMap].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([label, n]) => ({ label, n })));
-  }
-
   renderGlobal(rows);
 
-  const cols = showTitles
-    ? ["组合键", "App", "窗口标题", "按键", "占比"]
-    : ["组合键", "App", "按键", "占比"];
+  const cols = ["组合键", "App", "按键", "占比"];
   el("detailHead").innerHTML = `<tr>${cols.map(c =>
     `<th${c === "按键" || c === "占比" ? ' class="n"' : ""}>${c}</th>`).join("")}</tr>`;
   const detail = [...rows].sort((a, b) => b.n - a.n).slice(0, 60);
   el("detail").querySelector("tbody").innerHTML = detail.length ? detail.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
       <td class="app">${esc(r.app)}</td>
-      ${showTitles ? `<td class="t" title="${esc(r.title || "")}">${esc(r.title || "—")}</td>` : ""}
       <td class="n">${fmt(r.n)}</td>
       <td class="pct">${pct(r.n, total)}</td>
     </tr>`).join("") : `<tr><td colspan="${cols.length}" class="empty">无数据</td></tr>`;
@@ -602,12 +571,9 @@ function refreshSelects() {
   fillSelect(el("fApp"), [...new Set(DATA.combos.map(r => r.app))], "全部 app", state.app);
   fillSelect(el("fMods"), [...new Set(DATA.combos.map(r => r.mods || ""))]
     .sort((a, b) => a.length - b.length), "全部修饰键", state.mods);
-  const titleRows = (DATA.titles || []).filter(r => !state.app || r.app === state.app);
-  fillSelect(el("fTitle"), [...new Set(titleRows.map(r => r.title))], "全部标题", state.title);
-  keep(el("fApp"), state.app); keep(el("fMods"), state.mods); keep(el("fTitle"), state.title);
-  state.app = el("fApp").value; state.mods = el("fMods").value; state.title = el("fTitle").value;
+  keep(el("fApp"), state.app); keep(el("fMods"), state.mods);
+  state.app = el("fApp").value; state.mods = el("fMods").value;
   el("fApp").title = state.app || "全部 app";
-  el("fTitle").title = state.title || "全部标题";
 }
 
 function renderAll() {
@@ -630,11 +596,11 @@ let signature = "";
 async function load(force) {
   if (!API) { renderAll(); return; }
   try {
-    const q = new URLSearchParams({ since: state.since, titles: state.titles ? "1" : "0" });
+    const q = new URLSearchParams({ since: state.since });
     const res = await fetch(`${API}?${q}`, { cache: "no-store" });
     if (!res.ok) throw new Error(await res.text());
     const next = await res.json();
-    const sig = `${next.meta.total}|${next.meta.last_event}|${next.combos.length}|${state.titles}`;
+    const sig = `${next.meta.total}|${next.meta.last_event}|${next.combos.length}`;
     if (!force && sig === signature) {  // nothing new; just move the clock on
       el("foot").querySelector("span:last-of-type") && renderAll();
       return;
@@ -651,15 +617,8 @@ function init() {
   const dist = [["bar", "条形"], ["pie", "饼图"]];
   const series = [["bar", "柱状"], ["line", "折线"]];
   segment(el("bucketSeg"), Object.entries(BUCKET_CN), state.bucket, v => { state.bucket = v; render(); });
-  segment(el("dimSeg"), [["app", "仅 app"], ["title", "app + 标题"]],
-    state.titles ? "title" : "app", v => {
-      state.titles = v === "title";
-      if (!state.titles) state.title = "";
-      if (API) load(true); else renderAll();
-    });
   segment(el("appSeg"), dist, state.chart.app, v => { state.chart.app = v; render(); });
   segment(el("modSeg"), dist, state.chart.mod, v => { state.chart.mod = v; render(); });
-  segment(el("titleSeg"), dist, state.chart.title, v => { state.chart.title = v; render(); });
   segment(el("hodSeg"), series, state.chart.hod, v => { state.chart.hod = v; render(); });
   segment(el("trendSeg"), series, state.chart.trend, v => { state.chart.trend = v; render(); });
 
@@ -671,22 +630,11 @@ function init() {
     el("fSince").onchange = e => { state.since = e.target.value; load(true); };
   }
 
-  if (!API && !(DATA.titles && DATA.titles.length)) {
-    const b = el("dimSeg").querySelector('button[data-v="title"]');
-    b.disabled = true;
-    b.title = "这份静态报告没有标题数据，用 keystats report --titles 重新生成";
-  }
-
   el("fApp").onchange   = e => { state.app = e.target.value; refreshSelects(); render(); };
-  el("fTitle").onchange = e => {
-    state.title = e.target.value;
-    e.target.title = state.title || "全部标题";   // the closed select is ellipsised
-    render();
-  };
   el("fMods").onchange  = e => { state.mods = e.target.value; render(); };
   el("reset").onclick = () => {
-    state.app = state.mods = state.title = "";
-    el("fApp").value = el("fMods").value = el("fTitle").value = "";
+    state.app = state.mods = "";
+    el("fApp").value = el("fMods").value = "";
     refreshSelects();
     render();
   };
