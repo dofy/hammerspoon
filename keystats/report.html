@@ -571,8 +571,8 @@ function refreshSelects() {
   fillSelect(el("fApp"), [...new Set(DATA.combos.map(r => r.app))], "全部 app", state.app);
   fillSelect(el("fMods"), [...new Set(DATA.combos.map(r => r.mods || ""))]
     .sort((a, b) => a.length - b.length), "全部修饰键", state.mods);
-  fillSelect(el("fTitle"), DATA.titles ? [...new Set(DATA.titles.map(r => r.title))] : [],
-    "全部标题", state.title);
+  const titleRows = (DATA.titles || []).filter(r => !state.app || r.app === state.app);
+  fillSelect(el("fTitle"), [...new Set(titleRows.map(r => r.title))], "全部标题", state.title);
   keep(el("fApp"), state.app); keep(el("fMods"), state.mods); keep(el("fTitle"), state.title);
   state.app = el("fApp").value; state.mods = el("fMods").value; state.title = el("fTitle").value;
 }
@@ -644,12 +644,13 @@ function init() {
     b.title = "这份静态报告没有标题数据，用 keystats report --titles 重新生成";
   }
 
-  el("fApp").onchange   = e => { state.app = e.target.value; render(); };
+  el("fApp").onchange   = e => { state.app = e.target.value; refreshSelects(); render(); };
   el("fTitle").onchange = e => { state.title = e.target.value; render(); };
   el("fMods").onchange  = e => { state.mods = e.target.value; render(); };
   el("reset").onclick = () => {
     state.app = state.mods = state.title = "";
     el("fApp").value = el("fMods").value = el("fTitle").value = "";
+    refreshSelects();
     render();
   };
 
