@@ -39,6 +39,19 @@ M.config = {
     -- without cmd/alt/ctrl. Off by default: a bare arrow key is navigation,
     -- not a shortcut, and it buries the real combinations in every ranking.
     includeBareSpecialKeys = false,
+    -- The live dashboard. Served by keystats/server.py as a child process, so a
+    -- heavy query can never block the event tap the way an in-process server
+    -- would. Loopback only: this database records every shortcut pressed.
+    server = {
+        enabled = true,
+        host = "127.0.0.1",
+        port = 8787,
+        python = "/usr/bin/python3",
+        -- Relaunch a server that exits on its own, up to this many times in a
+        -- row. A port already taken by an earlier run is not worth retrying.
+        maxRestarts = 3,
+        restartDelay = 5,
+    },
     -- A global hotkey is consumed before any app sees it, so the tap can only
     -- record whoever was frontmost. When a keystroke is followed by an app
     -- activation inside this many seconds, that target app is stored on the
@@ -63,6 +76,7 @@ local SPECIAL_KEY_NAMES = {
 }
 
 local tap, flushTimer, watchdogTimer, appWatcher
+local serverTask, serverRestarts, serverWanted = nil, 0, false
 local db, stmts
 local buffer, bufferCount = {}, 0
 local appCache = {}
@@ -321,6 +335,67 @@ local function onAppEvent(name, event, app)
     end
 end
 
+-- Live dashboard -------------------------------------------------------
+
+local startServer   -- forward declaration: the exit callback relaunches it
+
+local function onServerExit(code, stdout, stderr)
+    local out = ((stderr or "") .. (stdout or "")):gsub("%s+$", "")
+    serverTask = nil
+    if not serverWanted then return end
+
+    if out:find("Address already in use") then
+        log.w("dashboard port is already served by another process, not retrying")
+        return
+    end
+    if serverRestarts >= M.config.server.maxRestarts then
+        log.ef("dashboard exited %d times, giving up: %s", serverRestarts, out)
+        return
+    end
+    serverRestarts = serverRestarts + 1
+    log.wf("dashboard exited (code %s), restarting in %ds: %s",
+        tostring(code), M.config.server.restartDelay, out)
+    hs.timer.doAfter(M.config.server.restartDelay, function()
+        if serverWanted then startServer() end
+    end)
+end
+
+startServer = function()
+    local cfg = M.config.server
+    if serverTask and serverTask:isRunning() then return end
+
+    local script = hs.configdir .. "/keystats/server.py"
+    if not hs.fs.attributes(script) then
+        log.ef("dashboard script missing: %s", script)
+        return
+    end
+
+    serverTask = hs.task.new(cfg.python, onServerExit, {
+        script,
+        "--db", M.config.dbPath,
+        "--template", hs.configdir .. "/keystats/report.html",
+        "--host", cfg.host,
+        "--port", tostring(cfg.port),
+        -- A SIGTERM to Hammerspoon never reaches hs.shutdownCallback, so the
+        -- child has to notice the parent is gone by itself.
+        "--exit-with-parent",
+    })
+    if serverTask and serverTask:start() then
+        log.f("dashboard on http://%s:%d", cfg.host, cfg.port)
+    else
+        log.e("could not start the dashboard task")
+        serverTask = nil
+    end
+end
+
+local function stopServer()
+    serverWanted = false
+    if serverTask then
+        serverTask:terminate()
+        serverTask = nil
+    end
+end
+
 -- Lifecycle ------------------------------------------------------------
 
 function M.start()
@@ -418,9 +493,15 @@ function M.start()
         end
     end)
 
+    if M.config.server.enabled then
+        serverWanted, serverRestarts = true, 0
+        startServer()
+    end
+
     prevShutdownCallback = hs.shutdownCallback
     hs.shutdownCallback = function()
         flush()
+        stopServer()
         if prevShutdownCallback then prevShutdownCallback() end
     end
 
@@ -429,6 +510,7 @@ function M.start()
 end
 
 function M.stop()
+    stopServer()
     if tap then tap:stop(); tap = nil end
     if flushTimer then flushTimer:stop(); flushTimer = nil end
     if watchdogTimer then watchdogTimer:stop(); watchdogTimer = nil end
@@ -455,7 +537,10 @@ end
 function M.status()
     flush()
     local info = { running = tap ~= nil, enabled = tap and tap:isEnabled() or false,
-                   buffered = bufferCount, db = M.config.dbPath }
+                   buffered = bufferCount, db = M.config.dbPath,
+                   dashboard = (serverTask and serverTask:isRunning())
+                       and ("http://" .. M.config.server.host .. ":" .. M.config.server.port)
+                       or false }
     local out = hs.execute(("/usr/bin/sqlite3 %q 'SELECT count(*), sum(n) FROM event'"):format(M.config.dbPath))
     info.events = (out or ""):gsub("%s+$", "")
     return info

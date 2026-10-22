@@ -63,8 +63,17 @@ and `hourofday`.
 
 ### The dashboard
 
-`keystats serve` starts a small read-only HTTP server on `127.0.0.1:8787` (`--port`, `--host`)
-and opens the same page the static report uses. It polls the database every five seconds, so the
+`init.lua` already starts that dashboard: the collector supervises `keystats/server.py` as a
+child task, so it is up whenever Hammerspoon is (`config.server` holds `enabled`, `host`, `port`
+and the restart policy). A heavy query therefore runs in another process and can never stall the
+event tap, which an in-process server would. The child watches `getppid()` and exits on its own
+when Hammerspoon goes away, because a `SIGTERM` or `SIGKILL` to the parent never reaches
+`hs.shutdownCallback` and the port would otherwise stay held. Reloading the config replaces the
+server; if the port is already taken the collector logs it once and leaves the running server
+alone rather than retrying.
+
+`keystats serve` starts the same thing by hand on `127.0.0.1:8787` (`--port`, `--host`), for a
+second instance or a different database. It polls the database every five seconds, so the
 numbers move while you work; the footer carries the refresh clock and a pause button. The server
 binds to loopback on purpose — this database is a record of every shortcut you press.
 

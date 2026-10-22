@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 import time
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -28,6 +29,26 @@ FROM = """
   JOIN app a ON a.id = e.app_id
   LEFT JOIN keyname k ON k.keycode = e.keycode
 """
+
+
+def exit_with_parent(interval: float = 2.0) -> None:
+    """Exit once the parent process is gone.
+
+    Hammerspoon supervises this server as a child task, but a SIGTERM or
+    SIGKILL to Hammerspoon never reaches its Lua shutdown callback, so the
+    server would outlive it and keep the port. Watching getppid() covers every
+    way the parent can die. Opt-in, because a server started from a shell with
+    `keystats serve &` is reparented immediately and would exit at once.
+    """
+    original = os.getppid()
+
+    def watch():
+        while True:
+            time.sleep(interval)
+            if os.getppid() != original:
+                os._exit(0)
+
+    threading.Thread(target=watch, daemon=True).start()
 
 
 def epoch_of(value: str) -> int:
@@ -150,10 +171,15 @@ def main():
     ap.add_argument("--port", type=int, default=8787)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--exit-with-parent", action="store_true",
+                    help="stop as soon as the parent process goes away")
     args = ap.parse_args()
 
     if not os.path.exists(args.db):
         raise SystemExit(f"keystats: no database at {args.db}")
+
+    if args.exit_with_parent:
+        exit_with_parent()
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.db, httpd.template, httpd.verbose = args.db, args.template, args.verbose

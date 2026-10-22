@@ -31,8 +31,11 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
   app that was in front has terminated — otherwise `⌘Q` reads as a hotkey summoning whatever was
   behind it. Verdicts additionally need three hits and a concentrated target, so `⌘Tab` reads as
   a switcher rather than a launcher.
-  `keystats/server.py` serves the dashboard live over loopback; `keystats/report.html` is shared
-  by the server and by static `keystats report` output through two markers it substitutes. The callback makes **no** OS calls: the frontmost
+  `keystats/server.py` serves the dashboard live over loopback and is supervised from `start()`
+  as an `hs.task`, so its queries cannot stall the event tap; it is passed `--exit-with-parent`
+  because a signal to Hammerspoon never reaches `hs.shutdownCallback`. `keystats/report.html` is
+  shared by the server and by static `keystats report` output through two markers it
+  substitutes. The callback makes **no** OS calls: the frontmost
   app comes from an `hs.application.watcher`, because reading it in the hot path adds typing
   latency. Window titles were collected until 2026-10-22 and removed as noise; `start()` still
   drops `event.title_id` and the `title` table from older databases. A watchdog
