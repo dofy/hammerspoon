@@ -21,9 +21,10 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 - `mouse-follow.lua` — warps the cursor to the center of a window's screen on focus. Uses an `hs.window.filter` for focus/creation events and an `hs.eventtap` on `leftMouseDown` to suppress warping right after a click (so clicking to focus doesn't move the mouse).
 - `keystats.lua` — shortcut-usage collector. An `hs.eventtap` on `keyDown` keeps only keys
   carrying cmd/alt/ctrl (shift counts only as a co-modifier unless the exact combination is
-  named in `config.alwaysRecord`, which carries Raycast's `shift+space`; bare Escape / F-keys /
-  arrows need `config.includeBareSpecialKeys`), buffers them in memory and flushes to SQLite (`hs.sqlite3`)
-  every 5s. When an app activation arrives within `config.globalSwitchWindow` of the last
+  named in `config.alwaysRecord`, which carries Raycast's `shift+space`; bare Escape and F-keys
+  ride on `config.includeBareFunctionKeys`, on by default because the dropped `fn` flag leaves
+  them modifier-less, while bare arrows need `config.includeBareNavigationKeys`), buffers them in
+  memory and flushes to SQLite (`hs.sqlite3`) every 5s. When an app activation arrives within `config.globalSwitchWindow` of the last
   buffered keystroke, one press is split off and tagged with that app in `event.switch_to`,
   which is the only hard evidence available that a combination was a global hotkey (an event tap
   runs before any handler consumes the key, so the frontmost app is all it can otherwise see).

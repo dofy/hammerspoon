@@ -143,10 +143,13 @@ Raycast's panel, which does not take activation.
 ### What it does and does not record
 
 A keystroke is recorded only when it carries ⌘, ⌥ or ⌃. Shift alone is capitalisation, so it
-counts only as a co-modifier, and a bare arrow key, Escape or function key is navigation rather
-than a shortcut (`config.includeBareSpecialKeys` turns those back on). Plain character keys are
-never recorded unless `config.includePlainKeys` is set, so the database holds no typed text and
-no window titles.
+counts only as a co-modifier. Escape and the function keys are the exception that
+`config.includeBareFunctionKeys` records bare, on by default: macOS sets the `fn` flag on every
+function key and this module drops that flag, so an unmodified F5 arrives carrying nothing at all
+and would otherwise be invisible. A bare arrow key or page-up is movement rather than a shortcut
+and stays out unless `config.includeBareNavigationKeys` is set. Plain character keys are never
+recorded unless `config.includePlainKeys` is set, so the database holds no typed text and no
+window titles.
 
 Real hotkeys that live on Shift alone are named individually in `config.alwaysRecord`, which
 ships with Raycast's `shift+space`. Write the key the way this module spells it: modifiers in

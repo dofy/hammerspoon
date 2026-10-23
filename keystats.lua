@@ -35,10 +35,15 @@ M.config = {
     -- writes: modifiers in ctrl+alt+shift+cmd order, then the key name from
     -- hs.keycodes.map, joined with '+'.
     alwaysRecord = { ["shift+space"] = true },
-    -- Record Escape, the function keys and the navigation keys when pressed
-    -- without cmd/alt/ctrl. Off by default: a bare arrow key is navigation,
-    -- not a shortcut, and it buries the real combinations in every ranking.
-    includeBareSpecialKeys = false,
+    -- Record Escape and the function keys when pressed without cmd/alt/ctrl.
+    -- macOS sets the fn flag on every function key and modsString drops it, so
+    -- these arrive carrying no modifier at all and would otherwise be invisible.
+    includeBareFunctionKeys = true,
+    -- Record the navigation keys (arrows, home/end, page up/down, forward
+    -- delete, help) when pressed without cmd/alt/ctrl. Off by default: a bare
+    -- arrow key is navigation, not a shortcut, and holding one down buries
+    -- every real combination in the ranking.
+    includeBareNavigationKeys = false,
     -- The live dashboard. Served by keystats/server.py as a child process, so a
     -- heavy query can never block the event tap the way an in-process server
     -- would. Loopback only: this database records every shortcut pressed.
@@ -66,13 +71,18 @@ M.config = {
     debug = false,
 }
 
--- Keys that count as a shortcut without cmd/alt/ctrl, but only when
--- config.includeBareSpecialKeys is on.
-local SPECIAL_KEY_NAMES = {
-    "escape", "home", "end", "pageup", "pagedown", "forwarddelete", "help",
-    "left", "right", "up", "down",
+-- Keys that can count as a shortcut without cmd/alt/ctrl, split so each group
+-- has its own config flag: Escape and the function keys are plausible bare
+-- shortcuts, the navigation keys are just movement.
+local FUNCTION_KEY_NAMES = {
+    "escape",
     "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10",
     "f11", "f12", "f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20",
+}
+
+local NAVIGATION_KEY_NAMES = {
+    "home", "end", "pageup", "pagedown", "forwarddelete", "help",
+    "left", "right", "up", "down",
 }
 
 local tap, flushTimer, watchdogTimer, appWatcher
@@ -80,7 +90,7 @@ local serverTask, serverRestarts, serverWanted = nil, 0, false
 local db, stmts
 local buffer, bufferCount = {}, 0
 local appCache = {}
-local specialKeys = {}
+local functionKeys, navigationKeys = {}, {}
 local keyNames = {}
 local currentApp = { bundle = "unknown", name = "unknown" }
 local lastKey = nil
@@ -142,6 +152,15 @@ local function modsString(f)
     return table.concat(parts, "+")
 end
 
+local function keycodeSet(names)
+    local set = {}
+    for _, name in ipairs(names) do
+        local code = hs.keycodes.map[name]
+        if code then set[code] = true end
+    end
+    return set
+end
+
 local function appId(bundle, name)
     local id = appCache[bundle]
     if id then return id end
@@ -199,7 +218,8 @@ local function onKey(e)
     end
 
     if not (hasMod or whitelisted
-            or (M.config.includeBareSpecialKeys and specialKeys[keycode])
+            or (M.config.includeBareFunctionKeys and functionKeys[keycode])
+            or (M.config.includeBareNavigationKeys and navigationKeys[keycode])
             or M.config.includePlainKeys) then
         return false
     end
@@ -470,11 +490,8 @@ function M.start()
     db:exec("COMMIT")
     insName:finalize()
 
-    specialKeys = {}
-    for _, name in ipairs(SPECIAL_KEY_NAMES) do
-        local code = hs.keycodes.map[name]
-        if code then specialKeys[code] = true end
-    end
+    functionKeys = keycodeSet(FUNCTION_KEY_NAMES)
+    navigationKeys = keycodeSet(NAVIGATION_KEY_NAMES)
 
     local front = hs.application.frontmostApplication()
     if front then
