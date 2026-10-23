@@ -139,12 +139,20 @@ button.on { background: var(--accent-soft); border-color: var(--accent); }
 .legend .p { text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
 
 .chart { display: flex; flex-direction: column; gap: var(--sp-1); }
-.hist { display: flex; align-items: flex-end; gap: 4px; height: 120px; }
+/* A tooltip-only readout disappears the moment the chart becomes an image, so
+   the scale is drawn as well: three recessive gridlines, labelled. */
+.plot { position: relative; padding-left: 40px; }
+.gridline { position: absolute; left: 40px; right: 0; border-top: 1px dashed var(--line); }
+.gridline > span {
+  position: absolute; right: 100%; padding-right: 7px; transform: translateY(-50%);
+  color: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.hist { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 120px; }
 .hist .col { flex: 1; max-width: 64px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
 .hist .col:hover { background: var(--h5); }
-.axis { display: flex; gap: 4px; color: var(--faint); font-size: 10px; }
+.axis { display: flex; gap: 4px; color: var(--faint); font-size: 10px; padding-left: 40px; }
 .axis span { flex: 1; max-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
-.lineclip { height: 120px; }
+.lineclip { position: relative; height: 120px; }
 .lineclip svg { width: 100%; height: 120px; display: block; }
 
 table { width: 100%; border-collapse: collapse; }
@@ -444,6 +452,10 @@ function drawSeries(node, kind, buckets, labelFn) {
   const mx = Math.max(1, ...buckets.map(b => b.n));
   const axis = `<div class="axis">${buckets.map((b, i) =>
     `<span>${esc(labelFn(b, i, buckets.length))}</span>`).join("")}</div>`;
+  // Top, middle and baseline. The top line is the actual maximum rather than a
+  // rounded-up one, because the marks are scaled against that same maximum.
+  const grid = [1, 0.5, 0].map(t =>
+    `<div class="gridline" style="bottom:${t * 100}%"><span>${fmt(Math.round(mx * t))}</span></div>`).join("");
   if (kind === "line") {
     const W = 1000, H = 120, pad = 4;
     const x = i => buckets.length === 1 ? W / 2 : pad + i * (W - 2 * pad) / (buckets.length - 1);
@@ -453,18 +465,18 @@ function drawSeries(node, kind, buckets, labelFn) {
     const dots = buckets.length <= 40 ? buckets.map((b, i) =>
       `<circle cx="${x(i).toFixed(1)}" cy="${y(b.n).toFixed(1)}" r="4" fill="var(--accent)"
          vector-effect="non-scaling-stroke" data-tip="${esc(b.label)} · ${fmt(b.n)} 次"></circle>`).join("") : "";
-    node.innerHTML = `<div class="chart"><div class="lineclip">
+    node.innerHTML = `<div class="chart"><div class="plot">${grid}<div class="lineclip">
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
           <polygon points="${area}" fill="var(--accent)" opacity=".12"></polygon>
           <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2"
             stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
           ${dots}
-        </svg></div>${axis}</div>`;
+        </svg></div></div>${axis}</div>`;
   } else {
-    node.innerHTML = `<div class="chart"><div class="hist">${buckets.map(b =>
+    node.innerHTML = `<div class="chart"><div class="plot">${grid}<div class="hist">${buckets.map(b =>
       `<div class="col" style="height:${Math.max(2, 100 * b.n / mx)}%" data-tip="${
         esc(b.label)} · ${fmt(b.n)} 次"></div>`
-    ).join("")}</div>${axis}</div>`;
+    ).join("")}</div></div>${axis}</div>`;
   }
 }
 

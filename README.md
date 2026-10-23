@@ -81,8 +81,9 @@ binds to loopback on purpose — this database is a record of every shortcut you
 sharing. Both carry a keyboard heatmap; one shortcut table combining the ranking with the
 global-vs-in-app verdict (they were two views of the same per-combination aggregate); the
 per-app and per-modifier split, each switchable between bars and a donut; a time-of-day
-histogram and a trend chart, each switchable between bars and a line; and a collapsed
-combination × app detail table. Everything re-pivots client-side from the app and modifier
+histogram and a trend chart, each switchable between bars and a line and each carrying a
+labelled scale, because a chart read only through its tooltip says nothing once it becomes an
+image; and a combination × app detail table. Everything re-pivots client-side from the app and modifier
 selectors.
 
 **生成分享图** rasterises the page itself into a PNG — preview, download, or copy to the
