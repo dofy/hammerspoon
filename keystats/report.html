@@ -171,6 +171,15 @@ details.panel > summary::before { content: "▸"; color: var(--faint); }
 details.panel[open] > summary::before { content: "▾"; }
 
 .empty { color: var(--faint); padding: var(--sp-4) 0; text-align: center; }
+/* The native title attribute waits out the OS delay before it appears, which is
+   useless on a chart you are sweeping the cursor across. */
+.tip {
+  position: fixed; z-index: 60; pointer-events: none;
+  background: var(--ink); color: var(--bg);
+  border-radius: 6px; padding: 5px 9px; font-size: 12px; line-height: 1.35;
+  white-space: nowrap; box-shadow: 0 2px 10px rgba(0, 0, 0, .28);
+}
+
 .sheet {
   position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
   background: rgba(8, 10, 14, .62); padding: var(--sp-3); backdrop-filter: blur(2px);
@@ -261,7 +270,7 @@ footer code { color: var(--muted); }
     </div>
   </div>
 
-  <details class="panel" id="detailPanel">
+  <details class="panel" id="detailPanel" open>
     <summary><span class="sumtitle">明细</span> <span class="scope">组合键 × app</span></summary>
     <div class="tablewrap"><table id="detail">
       <thead id="detailHead"></thead>
@@ -271,6 +280,8 @@ footer code { color: var(--muted); }
 
   <footer id="foot"></footer>
 </div>
+
+<div class="tip" id="tip" role="tooltip" data-noexport hidden></div>
 
 <div class="sheet" id="shareSheet" hidden>
   <div class="sheet-box">
@@ -377,9 +388,9 @@ function barList(node, items) {
   if (!items.length) { node.innerHTML = '<div class="empty">无数据</div>'; return; }
   const mx = items[0].n;
   node.innerHTML = `<div class="bars">` + items.map((it, i) => `<div class="bar">
-      <span class="lbl" title="${esc(it.label)}">${it.html || esc(it.label)}</span>
-      <span class="track"><span class="fill" style="width:${Math.max(1, 100 * it.n / mx)}%${
-        it.color ? ";background:" + it.color : ""}"></span></span>
+      <span class="lbl" data-tip="${esc(it.label)} · ${fmt(it.n)} 次">${it.html || esc(it.label)}</span>
+      <span class="track" data-tip="${esc(it.label)} · ${fmt(it.n)} 次"><span class="fill" style="width:${
+        Math.max(1, 100 * it.n / mx)}%${it.color ? ";background:" + it.color : ""}"></span></span>
       <span class="num">${fmt(it.n)}</span>
     </div>`).join("") + `</div>`;
 }
@@ -400,7 +411,8 @@ function donut(node, items) {
   let a = -Math.PI / 2, marks = "";
   if (items.length === 1) {
     marks = `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none"
-      stroke="${items[0].color}" stroke-width="${R - r}"><title>${esc(items[0].label)} ${fmt(total)} 100%</title></circle>`;
+      stroke="${items[0].color}" stroke-width="${R - r}"
+      data-tip="${esc(items[0].label)} · ${fmt(total)} 次 · 100%"></circle>`;
   } else {
     for (const it of items) {
       const span = (it.n / total) * Math.PI * 2, b = a + span;
@@ -408,7 +420,7 @@ function donut(node, items) {
       const pt = (ang, rad) => `${(cx + rad * Math.cos(ang)).toFixed(2)} ${(cy + rad * Math.sin(ang)).toFixed(2)}`;
       marks += `<path d="M${pt(a, R)}A${R} ${R} 0 ${big} 1 ${pt(b, R)}L${pt(b, r)}A${r} ${r} 0 ${big} 0 ${pt(a, r)}Z"
         fill="${it.color}" stroke="var(--panel)" stroke-width="2"
-        ><title>${esc(it.label)} ${fmt(it.n)} ${pct(it.n, total)}</title></path>`;
+        data-tip="${esc(it.label)} · ${fmt(it.n)} 次 · ${pct(it.n, total)}"></path>`;
       a = b;
     }
   }
@@ -440,7 +452,7 @@ function drawSeries(node, kind, buckets, labelFn) {
     const area = `${x(0).toFixed(1)},${H} ${pts} ${x(buckets.length - 1).toFixed(1)},${H}`;
     const dots = buckets.length <= 40 ? buckets.map((b, i) =>
       `<circle cx="${x(i).toFixed(1)}" cy="${y(b.n).toFixed(1)}" r="4" fill="var(--accent)"
-         vector-effect="non-scaling-stroke"><title>${esc(b.label)} ${fmt(b.n)}</title></circle>`).join("") : "";
+         vector-effect="non-scaling-stroke" data-tip="${esc(b.label)} · ${fmt(b.n)} 次"></circle>`).join("") : "";
     node.innerHTML = `<div class="chart"><div class="lineclip">
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
           <polygon points="${area}" fill="var(--accent)" opacity=".12"></polygon>
@@ -450,7 +462,8 @@ function drawSeries(node, kind, buckets, labelFn) {
         </svg></div>${axis}</div>`;
   } else {
     node.innerHTML = `<div class="chart"><div class="hist">${buckets.map(b =>
-      `<div class="col" style="height:${Math.max(2, 100 * b.n / mx)}%" title="${esc(b.label)}  ${fmt(b.n)}"></div>`
+      `<div class="col" style="height:${Math.max(2, 100 * b.n / mx)}%" data-tip="${
+        esc(b.label)} · ${fmt(b.n)} 次"></div>`
     ).join("")}</div>${axis}</div>`;
   }
 }
@@ -465,7 +478,7 @@ function drawKeyboard(rows) {
     const lvl = n === 0 ? 0 : Math.min(5, 1 + Math.floor(4 * Math.log1p(n) / Math.log1p(mx)));
     const num = n ? `<span class="n">${n > 999 ? (n / 1000).toFixed(1) + "k" : n}</span>` : "";
     return `<div class="key ${cls || ""}" data-lvl="${lvl}" style="background:var(--h${lvl})"
-      title="${esc(label)}  ${fmt(n)}"><span>${esc(label)}</span>${num}</div>`;
+      data-tip="${esc(label)} · ${fmt(n)} 次"><span>${esc(label)}</span>${num}</div>`;
   }).join("") + `</div>`).join("");
 }
 
@@ -483,6 +496,11 @@ function bucketKey(d, bucket) {
 }
 
 function render() {
+  // A re-render replaces the hovered mark, so a tip left on screen would be
+  // describing a node that no longer exists.
+  const tip = el("tip");
+  if (tip) tip.hidden = true;
+
   const rows = activeRows();
   const total = rows.reduce((s, r) => s + r.n, 0);
   const combos = new Set(rows.map(r => (r.mods || "") + "/" + r.key)).size;
@@ -657,6 +675,40 @@ async function load(force) {
 // a clone plus this page's own stylesheet needs no library and works from
 // file:// too; it only stays untainted because the page loads no external
 // image or font.
+// One delegated listener instead of a title attribute per mark: the tip follows
+// the cursor with no OS delay, and stays inside the viewport.
+function initTooltip() {
+  const tip = el("tip");
+  let current = null;
+
+  const place = (x, y) => {
+    tip.hidden = false;
+    const box = tip.getBoundingClientRect();
+    const pad = 12;
+    let left = x + 14, top = y + 16;
+    if (left + box.width > innerWidth - pad) left = x - box.width - 14;
+    if (top + box.height > innerHeight - pad) top = y - box.height - 14;
+    tip.style.left = `${Math.max(pad, left)}px`;
+    tip.style.top = `${Math.max(pad, top)}px`;
+  };
+
+  const hide = () => { current = null; tip.hidden = true; };
+
+  document.addEventListener("pointermove", e => {
+    const target = e.target.closest ? e.target.closest("[data-tip]") : null;
+    if (!target) { if (current) hide(); return; }
+    if (target !== current) {
+      current = target;
+      tip.textContent = target.getAttribute("data-tip");
+    }
+    place(e.clientX, e.clientY);
+  }, { passive: true });
+
+  document.addEventListener("pointerdown", hide, { passive: true });
+  addEventListener("scroll", hide, { passive: true, capture: true });
+  addEventListener("blur", hide);
+}
+
 // Every custom property this stylesheet declares, wherever it declares them, so
 // a token added later is carried into the export without touching this code.
 function customPropertyNames() {
@@ -809,6 +861,7 @@ function init() {
   };
 
   initShare();
+  initTooltip();
 
   if (API) {
     load(true);

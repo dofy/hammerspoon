@@ -92,8 +92,13 @@ stays untainted only because the page loads no external image or font. Inside th
 is not `:root`, so neither the dark media query nor `:root[data-theme]` matches it and
 `body { color }` never applies either; the resolved custom properties and text colour are copied
 onto the clone instead of relying on a selector.
-Interactive chrome carrying `data-noexport` — the share button itself, the pause button — is
-stripped first, and the detail table is captured in whatever state it is on screen.
+Interactive chrome carrying `data-noexport` — the share button, the pause button, the tooltip —
+is stripped first, and the detail table is captured in whatever state it is on screen.
+
+Marks carry their readout in `data-tip` rather than a `title`, because the native tooltip waits
+out the OS delay before appearing and that is useless while sweeping a cursor across a chart.
+One delegated `pointermove` listener positions a single bubble, clamped to the viewport, and
+clears it whenever the page re-renders underneath it.
 
 Window titles were collected until 2026-10-22 and then dropped: in the apps that carry the most
 shortcuts the title was a constant (`微信`, `飞书`) and added nothing to the app name, while the
