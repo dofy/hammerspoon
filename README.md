@@ -122,9 +122,15 @@ is in front is therefore filed under Cursor. Two signals narrow it down, and `ke
 - **focus** — the share of those activations that went to the most common target. A launcher
   always lands on the same app; `⌘Tab` scatters over everything, which reads as *switcher* rather
   than a launcher for any one app.
-- **spread** — the Shannon entropy of the combination's distribution over apps, normalised by
-  `log2(apps in range)`. A per-app shortcut clusters in one app; a global one shows up
-  everywhere. Four or more apps and a spread of 0.6 or higher reads as *suspected global*.
+- **跨 app / spread** — whether the combination belongs to one application or turns up
+  everywhere. It is the Shannon entropy of its distribution over apps normalised by
+  `log2(apps in range)`, which counts the balance and not just the number of apps: 100 presses in
+  Chrome and one in Finder is two apps but still Chrome's shortcut. Four or more apps and a
+  spread of 0.6 or higher reads as *suspected global*.
+
+The dashboard shows both as a segmented meter rather than a bare `0.37`, because the level reads
+off the number of filled cells — legible in greyscale, in print and to a colour-blind viewer —
+while the figure itself, the app count and which app the switches went to sit in the tooltip.
 
 `⌘Q` used to look like a global hotkey, because quitting the frontmost app brings the next one
 forward. macOS reports the termination *after* that activation, so the quit cannot be filtered

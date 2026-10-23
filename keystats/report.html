@@ -165,6 +165,14 @@ td.app { white-space: nowrap; }
 td.pct { color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tablewrap { overflow-x: auto; }
 .tablewrap table { min-width: 620px; }
+/* A segmented meter instead of a bare 0.37: the level reads from how many
+   cells are filled, so it survives greyscale and colour-blind viewing, and the
+   exact figure lives in the tooltip. */
+.meter { display: inline-flex; gap: 2px; vertical-align: middle; }
+.meter i { width: 7px; height: 13px; border-radius: 2px; background: var(--track); }
+.meter i.on { background: var(--accent); }
+td.meter-cell { white-space: nowrap; }
+
 th.barcol { width: 34%; }
 td.bar-cell { padding-right: 0; }
 td.bar-cell .track { display: block; background: var(--track); border-radius: 999px; height: 10px; overflow: hidden; }
@@ -249,8 +257,8 @@ footer code { color: var(--muted); }
     <h2>快捷键 <span class="scope" id="comboNote"></span></h2>
     <div class="tablewrap"><table id="comboTable">
       <thead><tr><th>组合键</th><th class="n">按键</th><th class="barcol"></th>
-        <th class="n">占比</th><th class="n">App 数</th><th class="n">离散度</th>
-        <th class="n">切换命中</th><th>判定</th></tr></thead>
+        <th class="n">占比</th><th class="n">App 数</th><th>跨 app</th>
+        <th>证据</th><th>判定</th></tr></thead>
       <tbody></tbody>
     </table></div>
   </div>
@@ -579,6 +587,13 @@ function render() {
 // launcher for any single app.
 const MIN_SWITCH_HITS = 3, FOCUS_MIN = 0.8;
 
+// filled-of-total cells; `tip` carries the figure the cells approximate
+function meter(filled, cells, tip) {
+  const pips = Array.from({ length: cells },
+    (_, i) => `<i class="${i < filled ? "on" : ""}"></i>`).join("");
+  return `<span class="meter" data-tip="${esc(tip)}">${pips}</span>`;
+}
+
 function renderCombos(rows, total) {
   const perCombo = new Map();
   for (const r of rows) {
@@ -606,6 +621,25 @@ function renderCombos(rows, total) {
     const spread = scale ? h / scale : 0;
     const sw = switches.get(k);
     const focus = sw && sw.hits ? sw.best / sw.hits : null;
+
+    // 0 none · 1 too few to mean anything · 2 scattered targets · 3 one target
+    let evidence = 0, evidenceTip = "按完这个键之后，前台 app 从没跟着换过";
+    if (sw && sw.hits) {
+      const share = Math.round(focus * 100);
+      if (sw.hits < MIN_SWITCH_HITS) {
+        evidence = 1;
+        evidenceTip = `只有 ${sw.hits} 次按完切到了别的 app，次数太少说明不了什么`
+          + "（关掉窗口也会让下一个 app 顶上来）";
+      } else if (focus >= FOCUS_MIN) {
+        evidence = 3;
+        evidenceTip = `${sw.hits} 次按完前台切走，其中 ${share}% 都切到 ${sw.target}`;
+      } else {
+        evidence = 2;
+        evidenceTip = `${sw.hits} 次按完前台切走，但目标散在 ${sw.targets} 个 app 上`
+          + `（最常见的 ${sw.target} 也只占 ${share}%）`;
+      }
+    }
+
     let verdict, cls;
     if (sw && sw.hits >= MIN_SWITCH_HITS && focus >= FOCUS_MIN) {
       verdict = `全局 → ${sw.target}`; cls = "s1";
@@ -615,11 +649,11 @@ function renderCombos(rows, total) {
     else if (c.apps.size === 1) { verdict = "app 内"; cls = "s9"; }
     else { verdict = "不确定"; cls = "s9"; }
     return { ...c, spread, focus, switches: sw ? sw.hits : 0,
-             targets: sw ? sw.targets : 0, verdict, cls };
+             targets: sw ? sw.targets : 0, evidence, evidenceTip, verdict, cls };
   }).sort((a, b) => b.n - a.n).slice(0, 16);
 
-  el("comboNote").textContent = `按使用次数排序 · 离散度 = app 分布熵 / log2(${appTotal})`
-    + ` · 切换命中 = 按键后 0.6s 内前台 app 变化（≥${MIN_SWITCH_HITS} 次才算证据）`;
+  el("comboNote").textContent = "按使用次数排序 · 跨 app = 专属某个 app，还是到处都在用"
+    + " · 证据 = 按完键之后前台 app 有没有跟着换";
   const mx = list.length ? list[0].n : 1;
   el("comboTable").querySelector("tbody").innerHTML = list.length ? list.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
@@ -628,9 +662,10 @@ function renderCombos(rows, total) {
         Math.max(1, 100 * r.n / mx)}%"></span></span></td>
       <td class="pct">${pct(r.n, total)}</td>
       <td class="n">${r.apps.size}</td>
-      <td class="n">${r.spread.toFixed(2)}</td>
-      <td class="n">${r.switches || "—"}${r.focus !== null && r.switches >= MIN_SWITCH_HITS
-        ? ` <span class="x">·${r.focus.toFixed(2)}</span>` : ""}</td>
+      <td class="meter-cell">${meter(Math.round(r.spread * 5), 5,
+        `在 ${r.apps.size} 个 app 里用过 · 跨 app ${r.spread.toFixed(2)}`
+        + "（0 = 只在一个 app 里用，1 = 在各 app 里用得一样多）")}</td>
+      <td class="meter-cell">${meter(r.evidence, 3, r.evidenceTip)}</td>
       <td class="verdict"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--${r.cls});margin-right:6px"></span>${esc(r.verdict)}</td>
     </tr>`).join("") : `<tr><td colspan="8" class="empty">无数据</td></tr>`;
 }
