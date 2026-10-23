@@ -93,7 +93,9 @@ button.on { background: var(--accent-soft); border-color: var(--accent); }
 .kpi .v { font-size: 26px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .kpi .k { color: var(--muted); font-size: 12px; margin-top: 2px; }
 
-.cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--sp-3); align-items: start; }
+/* No align-items: start — the two cards in a row take the row's height, so the
+   shorter one lines up with the taller one. */
+.cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--sp-3); }
 .stack { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
 @media (max-width: 880px) { .cols { grid-template-columns: 1fr; } }
 
@@ -127,6 +129,7 @@ button.on { background: var(--accent-soft); border-color: var(--accent); }
 .bar .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar .track { display: block; background: var(--track); border-radius: 999px; height: 12px; overflow: hidden; }
 .bar .fill { display: block; height: 100%; border-radius: 999px; min-width: 3px; background: var(--accent); }
+.bar .fill.rest { background: var(--s9); }
 .bar .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
 
 .pie { display: flex; gap: var(--sp-4); align-items: center; flex-wrap: wrap; }
@@ -405,7 +408,8 @@ function barList(node, items) {
   const mx = items[0].n;
   node.innerHTML = `<div class="bars">` + items.map((it, i) => `<div class="bar">
       <span class="lbl" data-tip="${esc(it.label)} · ${fmt(it.n)} 次">${it.html || esc(it.label)}</span>
-      <span class="track" data-tip="${esc(it.label)} · ${fmt(it.n)} 次"><span class="fill" style="width:${
+      <span class="track" data-tip="${esc(it.label)} · ${fmt(it.n)} 次"><span class="fill${
+        it.rest ? " rest" : ""}" style="width:${
         Math.max(1, 100 * it.n / mx)}%${it.color ? ";background:" + it.color : ""}"></span></span>
       <span class="num">${fmt(it.n)}</span>
     </div>`).join("") + `</div>`;
@@ -417,6 +421,18 @@ function foldSeries(items) {
   const head = items.slice(0, SERIES_MAX - 1).map((it, i) => ({ ...it, color: `var(--s${i + 1})` }));
   const rest = items.slice(SERIES_MAX - 1);
   head.push({ label: `其他 (${rest.length})`, n: rest.reduce((s, r) => s + r.n, 0), color: "var(--s9)" });
+  return head;
+}
+
+// Keeps the two distribution cards close in height, and a long tail of
+// single-press apps off the screen, without dropping what it represents.
+const BAR_ROWS = 12;
+
+function capSeries(items, max) {
+  if (items.length <= max) return items;
+  const head = items.slice(0, max - 1);
+  const rest = items.slice(max - 1);
+  head.push({ label: `其他 ${rest.length} 项`, n: rest.reduce((sum, r) => sum + r.n, 0), rest: true });
   return head;
 }
 
@@ -453,7 +469,7 @@ function donut(node, items) {
 
 function drawDist(node, kind, items) {
   if (kind === "pie") donut(node, foldSeries(items));
-  else barList(node, items);
+  else barList(node, capSeries(items, BAR_ROWS));
 }
 
 function drawSeries(node, kind, buckets, labelFn) {
