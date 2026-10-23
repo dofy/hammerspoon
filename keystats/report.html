@@ -367,22 +367,28 @@ const LAYOUT = [
 const SINCE_OPTS = [["today", "今天"], ["2d", "48 小时"], ["7d", "7 天"], ["30d", "30 天"],
                     ["3mo", "3 个月"], ["all", "全部"]];
 
+// "no modifier at all" is a real value of event.mods, so the unfiltered
+// choice cannot also be the empty string: one <select> cannot hold two options
+// with the same value, and "" would mean both "every combination" and "only the
+// bare ones". App names are never empty, so that filter keeps "" for its own.
+const ALL_MODS = "*";
+
 const state = {
-  app: "", mods: "", bucket: "day", since: "7d", paused: false,
+  app: "", mods: ALL_MODS, bucket: "day", since: "7d", paused: false,
   chart: { app: "bar", mod: "bar", hod: "bar", trend: "bar" },
 };
 
 function activeRows() {
   let rows = DATA.combos;
   if (state.app) rows = rows.filter(r => r.app === state.app);
-  if (state.mods !== "") rows = rows.filter(r => (r.mods || "") === state.mods);
+  if (state.mods !== ALL_MODS) rows = rows.filter(r => (r.mods || "") === state.mods);
   return rows;
 }
 
-function fillSelect(sel, values, label, current) {
+function fillSelect(sel, values, label, current, allValue = "") {
   sel.innerHTML = "";
   const all = document.createElement("option");
-  all.value = ""; all.textContent = label;
+  all.value = allValue; all.textContent = label;
   sel.append(all);
   for (const v of values) {
     const o = document.createElement("option");
@@ -687,11 +693,13 @@ function renderCombos(rows, total) {
 }
 
 function refreshSelects() {
-  const keep = (sel, v) => { if ([...sel.options].some(o => o.value === v)) sel.value = v; else sel.value = ""; };
+  const keep = (sel, v, allValue) => {
+    if ([...sel.options].some(o => o.value === v)) sel.value = v; else sel.value = allValue;
+  };
   fillSelect(el("fApp"), [...new Set(DATA.combos.map(r => r.app))], "全部 app", state.app);
   fillSelect(el("fMods"), [...new Set(DATA.combos.map(r => r.mods || ""))]
-    .sort((a, b) => a.length - b.length), "全部修饰键", state.mods);
-  keep(el("fApp"), state.app); keep(el("fMods"), state.mods);
+    .sort((a, b) => a.length - b.length), "全部修饰键", state.mods, ALL_MODS);
+  keep(el("fApp"), state.app, ""); keep(el("fMods"), state.mods, ALL_MODS);
   state.app = el("fApp").value; state.mods = el("fMods").value;
   el("fApp").title = state.app || "全部 app";
 }
@@ -917,8 +925,10 @@ function init() {
   el("fApp").onchange   = e => { state.app = e.target.value; refreshSelects(); render(); };
   el("fMods").onchange  = e => { state.mods = e.target.value; render(); };
   el("reset").onclick = () => {
-    state.app = state.mods = "";
-    el("fApp").value = el("fMods").value = "";
+    state.app = "";
+    state.mods = ALL_MODS;
+    el("fApp").value = "";
+    el("fMods").value = ALL_MODS;
     refreshSelects();
     render();
   };
