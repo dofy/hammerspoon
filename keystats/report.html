@@ -119,9 +119,11 @@ button.on { background: var(--accent-soft); border-color: var(--accent); }
    slot width rather than from the font's advance width. */
 .kc { display: inline-flex; align-items: baseline; white-space: nowrap;
       font-variant-numeric: tabular-nums; font-size: 15px; line-height: 1.2; }
-.kc .m { display: inline-block; width: .95em; text-align: center; font-style: normal; }
-.kc .m.off { color: var(--ghost); }
-.kc .k { display: inline-block; margin-left: .3em; font-weight: 600; }
+.kc .m { display: inline-block; width: .95em; text-align: center; font-style: normal;
+         font-size: 1.2em; font-weight: 600; color: var(--accent); }
+/* An unused slot only holds the column open, so it recedes almost to the paper. */
+.kc .m.off { color: var(--ghost); font-weight: 400; opacity: .3; }
+.kc .k { display: inline-block; margin-left: .3em; font-weight: 600; color: var(--accent); }
 
 /* one grid for the whole list, so every track starts at the same x */
 .bars { display: grid; grid-template-columns: minmax(0, 12em) 1fr max-content; column-gap: var(--sp-2); row-gap: 7px; align-items: center; }
@@ -342,10 +344,12 @@ const esc = t => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;")
   .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const el = id => document.getElementById(id);
 
-// Four modifier slots, greyed out when unused, then the key itself.
+// Four modifier slots: a pressed one takes the accent colour, an unused one fades
+// out but keeps its column. Then the key itself.
 function comboHTML(mods, key) {
   const on = new Set(String(mods || "").split("+").filter(Boolean));
-  const slots = MOD_SLOTS.map(([n, sym]) => `<i class="m${on.has(n) ? "" : " off"}">${sym}</i>`).join("");
+  const slots = MOD_SLOTS.map(([n, sym]) =>
+    `<i class="m${on.has(n) ? "" : " off"}">${sym}</i>`).join("");
   return `<span class="kc">${slots}${key == null ? "" : `<b class="k">${esc(prettyKey(key))}</b>`}</span>`;
 }
 
