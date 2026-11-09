@@ -9,6 +9,13 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 ## Applying & Testing Changes
 
 - **Reload config:** press `cmd+alt+ctrl+r` (bound in `init.lua`), or edits auto-reload via the `hs.pathwatcher` on `~/.hammerspoon/` — saving any `.lua` file triggers `hs.reload()`.
+- **`hs -c` hangs during a reload.** The `hs.ipc` port blocks, rather than erroring, while the
+  config is reloading, and a full reload here takes tens of seconds because `keystats.start()`
+  opens SQLite and spawns the dashboard server. macOS has no `timeout`, so wrap the call in a
+  background job with a hard kill instead of letting it hang. `hs.console.getConsole(true)`
+  returns an `hs.styledtext` object whose serialisation over `hs.ipc` recurses until the Lua
+  stack overflows — always call it with no argument. The console is capped near 100 000
+  characters, so a burst of warnings flushes earlier output and makes it useless as evidence.
 - **Debug output:** `print(...)` goes to the Hammerspoon Console (open from the menu-bar icon). There is no CLI test harness — verify behavior live in the running app.
 - **Run an ad-hoc module manually:** in the Console, e.g. `require("test").test()`.
 
@@ -44,10 +51,49 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
   strings are normalised to `ctrl+alt+shift+cmd` order and the `fn` flag is dropped (macOS sets
   it on every arrow and function key). Query the database with `keystats/keystats`, a zsh CLI
   over `/usr/bin/sqlite3` that also renders `keystats/report.html` into a local dashboard.
+- `statusbar.lua` — menu-bar host. Owns every `hs.menubar` item so individual widgets stay
+  small: a widget declares what to show (`render`) and how often (`interval`), and the host
+  creates the item, drives the timer and builds the dropdown. Widgets are files under
+  `statusbar/` named in `config.widgets`, which is set **only in `init.lua`** —
+  `statusbar.lua` deliberately ships an empty list so there is never a second place to look.
+  That list is also the on/off switch: a name in it runs, a name commented out does not. There
+  is no runtime toggle, no control item and nothing in `hs.settings`, so the file on disk is the
+  whole truth about what is mounted and a reload is the only way to change it.
+  `config.widgetConfig.<name>` overrides a widget's own `config` table from the same place.
+  Every call into widget code is wrapped in `pcall`: a widget that throws shows `⚠` with the
+  error as its tooltip and the rest of the bar keeps running. `render` runs on the main thread,
+  so anything waiting on the network or a subprocess belongs in `hs.task` / `hs.http.asyncGet`
+  with `ctx.update()` called from its callback. macOS decides where a status item sits;
+  `config.widgets` fixes mount order, not screen order. The host appends one `刷新` item to
+  every dropdown, which only re-renders — a widget that throttles its own fetching needs its own
+  forcing item.
+  - `statusbar/battery.lua` — timer-driven example (`interval = 30`), present in `statusbar/`
+    but commented out of `config.widgets`. `hs.battery.timeRemaining()` returns `-1` while macOS
+    is still calculating and `-2` on AC power; both mean "no estimate".
+  - `statusbar/kaon.lua` — Kaon Router spend against the daily budget, over the Admin API at
+    `kaon-router-admin-api.kaonai.com/api/v1`. The `kaon_pat_*` token is read once from
+    `~/.config/kaon/token` (mode 600, outside this repo so it cannot be committed) and never
+    printed; only HTTP status codes reach the tooltip, never a response body. Needs the
+    `usage:read` scope — Kaon's write scopes explicitly do not imply usage, stats or audit
+    access, so a token without it returns 403 forever.
+    Two sources disagree and the widget deliberately shows both: `/users/me/budget` is
+    authoritative for today (it is the counter the console's /keys banner shows and the one that
+    gates requests), while `/usage/summary` is Prometheus-derived and read ~8 USD higher for the
+    same date on 2026-11-09. The breakdown uses `range=7d`; `range=24h` is unusable, returning
+    five one-minute buckets instead of a day, and there is therefore no by_model breakdown for
+    today alone. `source=starrocks` is a T+1 warehouse whose newest bucket is yesterday.
+    The dropdown breaks the range down by model, by inference key and by provider.
+    `by_provider.total_requests` is 0 for every provider while its cost is populated, so the
+    provider rows show cost only; `by_model` and `by_key` both carry usable counts.
+    `automation_protocol_throttled` and `automation_token_suspended` are stop signals in Kaon's
+    contract, so a 401/403/429 is fatal: the widget stops requesting rather than risking token
+    suspension, and only a manual retry, a toggle or a reload clears it. `start()` also reads
+    `/auth/me` once for `automation_token_expires_at`, because a silently expired token would
+    otherwise present as nothing but a 401.
 - `test.lua` — battery-info diagnostic (`hs.battery.*`); not loaded by `init.lua`, invoke manually.
 - `ui-demo.lua` — UI demo scratch file; not loaded by `init.lua`.
 
-**Only modules explicitly `require`d in `init.lua` run.** `test.lua` and `Spoons/AClock.spoon` exist but are not loaded — Spoons would need `hs.loadSpoon("AClock")` to activate.
+A widget file that is not listed in `statusbar.config.widgets` never loads, even if it sits in `statusbar/`. **Only modules explicitly `require`d in `init.lua` run.** `test.lua` and `Spoons/AClock.spoon` exist but are not loaded — Spoons would need `hs.loadSpoon("AClock")` to activate.
 
 ## Critical Constraint
 

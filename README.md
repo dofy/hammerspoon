@@ -6,6 +6,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 
 - **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
 - **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
+- **Statusbar** (`statusbar.lua`) — a menu-bar host: small widget files under `statusbar/` say what to show and how often, and the host creates the status item, drives the refresh and builds the dropdown. Ships with a Kaon Router spend readout and a battery readout.
 - **Battery info** (`test.lua`) — an on-demand diagnostic that prints detailed battery stats (health, cycles, capacity, voltage…) to the Hammerspoon Console. Run `require("test").test()` in the Console.
 - **Manual reload** — press `⌘ + ⌥ + ⌃ + R` to reload the config at any time.
 - **Auto reload** — saving any `.lua` file under `~/.hammerspoon/` reloads the config automatically.
@@ -31,6 +32,8 @@ keystats.lua      # shortcut-usage collector (writes ~/.local/share/keystats/key
 keystats/keystats # CLI over that database
 keystats/server.py# live dashboard server (`keystats serve`)
 keystats/report.html # dashboard page, used by both the live server and static reports
+statusbar.lua     # menu-bar host (owns every hs.menubar item)
+statusbar/        # widget files, one status item each
 test.lua          # battery-info diagnostic (loaded on demand)
 Spoons/           # bundled Spoons
 ```
@@ -176,3 +179,98 @@ mouseFollow.config.clickDetectWindow = 0.3  -- window to ignore clicks that caus
 ```
 
 Toggle it at runtime with `mouseFollow.toggle()`.
+
+### Statusbar
+
+`init.lua` is the only file to edit. The widget list is also the on/off switch — a name in it
+runs, a name commented out does not:
+
+```lua
+local statusbar = require("statusbar")
+statusbar.config.widgets = {
+    "kaon",
+    -- "battery",
+}
+statusbar.config.widgetConfig.battery = {lowThreshold = 15}
+statusbar.start()
+```
+
+Saving the file reloads Hammerspoon, so the change takes effect immediately. There is no runtime
+toggle and nothing is stored outside the file: what the list says is what is mounted. To check
+what actually came up:
+
+```sh
+hs -c 'hs.inspect(require("statusbar").status())'
+```
+
+A widget that is listed but reads `false` there failed to mount; the Hammerspoon Console carries
+the reason.
+
+#### Kaon Router spend
+
+`statusbar/kaon.lua` shows today's Kaon Router spend against the daily budget, read from the
+Kaon Admin API. It needs an automation token:
+
+1. Open <https://kaon-router-admin.kaonai.com>, then **Automation Tokens** in the sidebar.
+2. Create a token with the **`usage:read`** scope. Kaon's write scopes do not imply usage access,
+   so a token without this scope gets 403 on every request, forever.
+3. Store it outside this repository, readable only by you:
+
+   ```sh
+   printf '%s' 'kaon_pat_...' > ~/.config/kaon/token
+   chmod 600 ~/.config/kaon/token
+   ```
+
+The token is read once at start and never printed; only HTTP status codes reach the tooltip.
+
+Two numbers in the dropdown disagree on purpose. `今日` comes from `/users/me/budget`, the counter
+the Kaon console's own banner shows and the one that actually gates requests. `按天 (Prometheus)`
+comes from `/usage/summary`, which read about 8 USD higher for the same date. Trust `今日`.
+There is no breakdown for today alone: the only range tokens are `5m | 1h | 24h | 7d | 30d`, and
+`24h` comes back as five one-minute buckets rather than a day, so the breakdown covers seven days
+and says so. It splits that range by model, by inference key and by provider. The provider rows
+show cost without a request count because the API reports 0 requests for every provider while
+still reporting its cost.
+
+A 401, 403 or 429 stops the widget instead of retrying — `automation_protocol_throttled` and
+`automation_token_suspended` are stop signals in Kaon's contract, and hammering through them
+risks the token being suspended. Clear the stopped state from the dropdown's **重试**, or by
+toggling the widget off and on.
+
+#### Writing a widget
+
+Drop a file in `statusbar/` and add its name to `config.widgets`. A widget returns a table:
+
+```lua
+local M = {}
+
+M.label    = "Disk"   -- shown in the ⚠ tooltip when render throws
+M.interval = 60       -- refresh seconds; nil means event-driven only
+M.config   = {path = "/"}
+
+function M.render(ctx)       -- required
+  local free = hs.fs.volume.allVolumes()[ctx.config.path]
+  if not free then return nil end          -- nil hides the item
+  return {title = "💾", tooltip = ctx.config.path}
+end
+
+function M.menu(ctx) return {{title = ctx.config.path, disabled = true}} end
+function M.start(ctx) end    -- install watchers here, call ctx.update() from them
+function M.stop(ctx) end     -- tear them down here
+
+return M
+```
+
+`render` may return a string, an `hs.styledtext` object, a table of
+`{title =, icon =, tooltip =, template =}`, or `nil` to take the item off the bar until the next
+non-nil render. `ctx` carries `ctx.name`, `ctx.config`, `ctx.bar` and `ctx.update()`.
+
+Two rules matter:
+
+- `render` runs on the main thread. Anything that waits on the network or a subprocess goes into
+  `hs.task` or `hs.http.asyncGet`, with `ctx.update()` called from the callback — a blocking
+  render freezes the menu bar.
+- `click` replaces the dropdown. Define one or the other, not both.
+
+Every call into widget code is wrapped in `pcall`. A widget that throws shows `⚠` with the error
+as its tooltip, and the other widgets keep running.

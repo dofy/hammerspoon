@@ -19,6 +19,17 @@ keystats.start()
 -- hs.ipc: 允许 `hs -c "..."` 从终端查询运行中的配置
 require("hs.ipc")
 
+-- Statusbar: 状态栏挂载入口，widget 放在 statusbar/ 下。
+-- 这个列表就是开关：留着的挂载，注释掉的不挂载。没有运行时开关，没有持久化状态。
+local statusbar = require("statusbar")
+statusbar.config.widgets = {
+    "kaon",
+    -- "battery",
+}
+-- 覆盖单个 widget 的参数（可选），键名同上
+-- statusbar.config.widgetConfig.kaon = {compact = true}
+statusbar.start()
+
 -- Show success message
 hs.alert.show("🎉 Hammerspoon 🎉", 2)
 
