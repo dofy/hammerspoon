@@ -77,8 +77,21 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
     `usage:read` scope — Kaon's write scopes explicitly do not imply usage, stats or audit
     access, so a token without it returns 403 forever. The title carries the spend alone: the
     daily budget never changes, so repeating it there spends menu-bar width on no information,
-    and it still appears in the tooltip and the dropdown. The budget is what the title's amber
-    and red thresholds are a fraction of.
+    and it still appears in the tooltip and the dropdown (`showBudget` puts it back). The budget
+    is what the title's amber and red thresholds are a fraction of.
+    The item is one composed image, not an icon plus a title: AppKit inserts ~17pt between an
+    `NSStatusItem`'s image and its own title and `hs.menubar` exposes no way to shrink it, so the
+    widget draws the glyph and the amount into a single `hs.canvas` and sets no title at all
+    (an *empty* title still reserves that padding, measured). What is left — 18pt of the item's
+    69pt — is AppKit's own and cannot be reached. The glyph is `statusbar/kaon.svg`, the Kaon
+    console's favicon with its violet plate removed and its viewBox cropped to the artwork, and
+    it ships as a **template image**: macOS tints the alpha mask to the menu-bar foreground
+    colour, which is what carries light/dark mode for free. The amber/red state opts out of
+    templating and paints itself, tinting the glyph through `compositeRule = "sourceAtop"` so the
+    colour lands on the icon's own pixels only. Text format is configurable through `decimals`,
+    `showBudget`, `budgetDecimals`, `budgetSeparator`, `symbol` and `font`; a Nerd Font glyph
+    works as `symbol` only when `font` names a patched font, since fallback for those private-use
+    codepoints is not guaranteed.
     Two sources disagree and the widget deliberately shows both: `/users/me/budget` is
     authoritative for today (it is the counter the console's /keys banner shows and the one that
     gates requests), while `/usage/summary` is Prometheus-derived and read ~8 USD higher for the

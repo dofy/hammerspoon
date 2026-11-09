@@ -44,7 +44,45 @@ M.config = {
     expiryWarnDays = 14,
     -- Seconds added per consecutive failure, capped, before another attempt.
     backoffStep = 60,
-    backoffMax = 1800
+    backoffMax = 1800,
+    -- Title font. nil = the macOS menu-bar default. Override from init.lua:
+    --   statusbar.config.widgetConfig.kaon = {
+    --       font = {name = "Menlo", size = 13}
+    --   }
+    -- An unknown font name is silently ignored by hs.styledtext and the default
+    -- is used, so check the name with `hs.styledtext.validFont(name)` first.
+    -- Keep size <= 14: macOS does not grow the menu bar, it clips the glyphs.
+    font = nil,
+    -- Currency marker in front of the amount.
+    symbol = "$",
+    -- Decimal places on the title amount. Clamped to 0..4, because the value
+    -- is spliced into a string.format spec.
+    decimals = 0,
+    -- Append the daily budget to the title, e.g. "$46 / $100". Off by default:
+    -- the budget never changes, so it spends menu-bar width on no information.
+    -- The tooltip and the dropdown always carry it.
+    showBudget = false,
+    -- Decimal places on that budget, and what goes between the two numbers.
+    budgetDecimals = 0,
+    budgetSeparator = " / ",
+    -- Menu-bar icon: the console's favicon shapes from
+    -- kaon-router-admin.kaonai.com/favicon.svg, with its violet plate removed.
+    -- NSImage renders SVG, so no raster conversion is needed. nil or a missing
+    -- file = text-only title.
+    iconPath = hs.configdir .. "/statusbar/kaon.svg",
+    -- Points. 16 is the usual menu-bar glyph size; the bar does not grow.
+    iconSize = 16,
+    -- A template image is tinted by macOS to the menu-bar foreground colour,
+    -- which is what makes the icon follow light/dark mode (and the inverted
+    -- look under a selected/dark menu bar). Only the alpha channel is read, so
+    -- the fills in the SVG do not matter. Setting this to false bakes those
+    -- fills in and the icon then disappears in one of the two modes.
+    iconTemplate = true,
+    -- Points between the icon and the amount inside the composed image. AppKit
+    -- inserts ~17pt of its own when the icon and the title are two separate
+    -- things on an NSStatusItem, and `hs.menubar` exposes no way to shrink it,
+    -- so the widget draws both into one image and leaves the title empty.
+    iconGap = 3
 }
 
 -- Private state
@@ -56,6 +94,7 @@ local lastOK = nil -- epoch seconds of the last successful budget read
 local lastError = nil -- human-readable, token-free
 local fatal = nil -- set once; stops all further requests
 local failures = 0
+local icon = nil -- hs.image, loaded once in start()
 local nextFetch = 0
 local inFlight = false
 local tick = 0
@@ -181,6 +220,87 @@ local function titleColor(r)
     return nil
 end
 
+-- A configured decimal count is spliced into a format spec, so it is clamped
+-- to a plain integer in 0..4 rather than trusted.
+local function places(n)
+    if type(n) ~= "number" then return 0 end
+    return math.max(0, math.min(4, math.floor(n)))
+end
+
+-- Icon and text in one image, so the item is only as wide as its content.
+-- A template image is tinted whole by macOS, which is what carries the icon
+-- *and* the text through a light/dark switch; `color` is therefore only set
+-- when the spend is over a threshold, and that state alone opts out of
+-- templating and paints itself.
+local function compose(text, color)
+    if not icon then return nil end
+    local font = M.config.font or {name = ".AppleSystemUIFont", size = 13}
+    local st = hs.styledtext.new(text, {font = font, color = color or
+                                            {white = 0, alpha = 1}})
+    local ts = hs.drawing.getTextDrawingSize(st)
+    local n = M.config.iconSize
+    local h = math.max(n, math.ceil(ts.h))
+    local w = n + M.config.iconGap + math.ceil(ts.w)
+
+    local c = hs.canvas.new({x = 0, y = 0, w = w, h = h})
+    c[1] = {
+        type = "image",
+        image = icon,
+        frame = {x = 0, y = (h - n) / 2, w = n, h = n},
+        imageScaling = "scaleProportionally"
+    }
+    -- Paints the colour onto the icon's own pixels only; the icon art is
+    -- monochrome, so there is nothing else to preserve.
+    if color then
+        c[2] = {
+            type = "rectangle",
+            action = "fill",
+            fillColor = color,
+            frame = {x = 0, y = (h - n) / 2, w = n, h = n},
+            compositeRule = "sourceAtop"
+        }
+    end
+    c[#c + 1] = {
+        type = "text",
+        text = st,
+        frame = {
+            x = n + M.config.iconGap,
+            y = (h - ts.h) / 2,
+            w = math.ceil(ts.w) + 1,
+            h = math.ceil(ts.h)
+        }
+    }
+    local img = c:imageFromCanvas()
+    c:delete()
+    return img
+end
+
+-- One image and an empty title when the icon is there, the plain styled title
+-- when it is not (missing file, or iconPath set to nil).
+local function titleFields(text, color)
+    local img = compose(text, color)
+    if img then
+        -- No `title` key at all: an NSStatusItem that carries a title, even an
+        -- empty one, still reserves the title's padding. The host only calls
+        -- setTitle when the key is present, and whether the icon is there is
+        -- decided once in start(), so this never leaves a stale title behind.
+        return {icon = img, template = M.config.iconTemplate and color == nil}
+    end
+    return {title = styled(text, color)}
+end
+
+-- Every title goes through here so the font applies to the placeholders too,
+-- not only to the amber/red spend. A plain string is returned when there is
+-- nothing to style, because styledtext is userdata and costs more to build.
+local function styled(text, color)
+    local font = M.config.font
+    if not font and not color then return text end
+    local attrs = {}
+    if font then attrs.font = font end
+    if color then attrs.color = color end
+    return hs.styledtext.new(text, attrs)
+end
+
 local function expiryNote()
     if not expiresAt then return nil end
     local days = math.floor((expiresAt - now()) / 86400)
@@ -194,17 +314,27 @@ end
 function M.render(ctx)
     fetch(ctx)
 
-    if fatal then return {title = "⚠ Kaon", tooltip = "Kaon: " .. fatal} end
+    if fatal then
+        local t = titleFields("⚠")
+        t.tooltip = "Kaon: " .. fatal
+        return t
+    end
     if not budget then
-        return {title = "Kaon …", tooltip = lastError or "Kaon: 读取中"}
+        local t = titleFields("…")
+        t.tooltip = lastError or "Kaon: 读取中"
+        return t
     end
 
     local spend = budget.personal_daily_spend_usd or 0
     local cap = budget.personal_daily_budget_usd
-    -- Today's spend alone. The menu bar on this machine is already full, and
-    -- the budget never changes, so repeating it in every item costs width for
-    -- no information; the tooltip and the dropdown still carry it.
-    local text = string.format("$%.0f", spend)
+    local text = string.format("%s%." .. places(M.config.decimals) .. "f",
+                               M.config.symbol, spend)
+    if M.config.showBudget and type(cap) == "number" then
+        text = text ..
+                   string.format("%s%s%." ..
+                                     places(M.config.budgetDecimals) .. "f",
+                                 M.config.budgetSeparator, M.config.symbol, cap)
+    end
 
     local tip = {string.format("今日 $%.2f", spend)}
     if cap then
@@ -217,9 +347,9 @@ function M.render(ctx)
         tip[#tip + 1] = "更新于 " .. os.date("%H:%M", lastOK)
     end
 
-    local color = titleColor(ratio())
-    local title = color and hs.styledtext.new(text, {color = color}) or text
-    return {title = title, tooltip = table.concat(tip, "\n")}
+    local t = titleFields(text, titleColor(ratio()))
+    t.tooltip = table.concat(tip, "\n")
+    return t
 end
 
 -- Dropdown ---------------------------------------------------------------------
@@ -403,6 +533,17 @@ end
 -- Lifecycle ---------------------------------------------------------------------
 
 function M.start(ctx)
+    icon = nil
+    if ctx.config.iconPath then
+        icon = hs.image.imageFromPath(ctx.config.iconPath)
+        if icon then
+            local n = ctx.config.iconSize
+            icon:setSize({w = n, h = n})
+        else
+            print("statusbar.kaon: cannot load icon " .. ctx.config.iconPath)
+        end
+    end
+
     token, lastError = readToken(ctx.config.tokenPath)
     budget, summary, expiresAt, lastOK = nil, nil, nil, nil
     fatal, failures, nextFetch, inFlight, tick = nil, 0, 0, false, 0
@@ -433,7 +574,7 @@ end
 
 function M.stop(ctx)
     token, budget, summary, expiresAt, lastOK = nil, nil, nil, nil, nil
-    lastError, fatal, inFlight = nil, nil, false
+    lastError, fatal, inFlight, icon = nil, nil, false, nil
 end
 
 return M

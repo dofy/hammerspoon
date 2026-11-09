@@ -228,6 +228,33 @@ monthly figures live in the tooltip and the dropdown — the budget does not cha
 hour, so putting it in the title would cost width for nothing. The title does turn amber at 70%
 and red at 90% of that budget.
 
+The glyph beside the amount is `statusbar/kaon.svg`, the Kaon console's own favicon with its
+violet plate removed. It is a template image, so macOS tints it to the menu-bar foreground colour
+and it follows light and dark mode without any code. Icon and amount are drawn into one image
+rather than set as an icon plus a title, because AppKit reserves about 17pt between those two and
+`hs.menubar` cannot shrink it; the item is 69pt wide against 51pt of content, and the remaining
+18pt is AppKit's own padding.
+
+Everything about the text is configurable from `init.lua`, under
+`statusbar.config.widgetConfig.kaon`:
+
+```lua
+statusbar.config.widgetConfig.kaon = {
+    font = {name = "Menlo", size = 13}, -- monospace: the width stops jumping
+    decimals = 0,                       -- 0..4 on the amount
+    showBudget = false,                 -- "$46 / $100" instead of "$46"
+    symbol = "$",                       -- marker in front of the amount
+    iconSize = 16,                      -- points; the menu bar does not grow
+    iconGap = 3                         -- points between glyph and amount
+}
+```
+
+`hs.styledtext.validFont` decides what `font` may name: on this machine `Menlo`, `Monaco` and
+`MesloLGS NF` pass while `SF Mono` does not, because it is not installed as a system font. A
+Nerd Font glyph works as `symbol` (`MesloLGS NF` carries real outlines for `nf-md-currency_usd`
+`\u{F01C1}` and friends), but only with `font` pointing at a patched font — macOS fallback for
+those private-use codepoints is not guaranteed to find one.
+
 Two numbers in the dropdown disagree on purpose. `今日` comes from `/users/me/budget`, the counter
 the Kaon console's own banner shows and the one that actually gates requests. `按天 (Prometheus)`
 comes from `/usage/summary`, which read about 8 USD higher for the same date. Trust `今日`.

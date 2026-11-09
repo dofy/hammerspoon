@@ -1,6 +1,6 @@
 -- Hammerspoon Configuration
 -- Manual reload with hotkey
-hs.hotkey.bind({"cmd", "alt", "ctrl"}, "r", function() hs.reload() end)
+hs.hotkey.bind({ "cmd", "alt", "ctrl" }, "r", function() hs.reload() end)
 
 -- Load modules
 local mouseFollow = require("mouse-follow")
@@ -28,6 +28,10 @@ statusbar.config.widgets = {
 }
 -- 覆盖单个 widget 的参数（可选），键名同上
 -- statusbar.config.widgetConfig.kaon = {warnRatio = 0.5}
+-- 等宽标题：金额位数变化时菜单栏宽度不跳。本机只有 Menlo / Monaco / MesloLGS NF
+-- 三个等宽字体通过 hs.styledtext.validFont，"SF Mono" 不通过。
+-- 图标走 statusbar/kaon.svg（控制台自己的 favicon），文本只用等宽字体。
+statusbar.config.widgetConfig.kaon = { font = { name = "Menlo", size = 13 } }
 statusbar.start()
 
 -- Show success message
@@ -41,5 +45,6 @@ function reloadConfig(files)
     end
     if doReload then hs.reload() end
 end
+
 local configPath = os.getenv("HOME") .. "/.hammerspoon/"
 myWatcher = hs.pathwatcher.new(configPath, reloadConfig):start()
