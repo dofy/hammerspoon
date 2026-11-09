@@ -208,7 +208,7 @@ the reason.
 
 #### Kaon Router spend
 
-`statusbar/kaon.lua` shows today's Kaon Router spend against the daily budget, read from the
+`statusbar/kaon.lua` shows today's Kaon Router spend in the menu bar, read from the
 Kaon Admin API. It needs an automation token:
 
 1. Open <https://kaon-router-admin.kaonai.com>, then **Automation Tokens** in the sidebar.
@@ -222,6 +222,11 @@ Kaon Admin API. It needs an automation token:
    ```
 
 The token is read once at start and never printed; only HTTP status codes reach the tooltip.
+
+The menu-bar title is the spend alone. The daily budget, what is left of it, and the weekly and
+monthly figures live in the tooltip and the dropdown — the budget does not change from hour to
+hour, so putting it in the title would cost width for nothing. The title does turn amber at 70%
+and red at 90% of that budget.
 
 Two numbers in the dropdown disagree on purpose. `今日` comes from `/users/me/budget`, the counter
 the Kaon console's own banner shows and the one that actually gates requests. `按天 (Prometheus)`

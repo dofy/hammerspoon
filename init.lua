@@ -27,7 +27,7 @@ statusbar.config.widgets = {
     -- "battery",
 }
 -- 覆盖单个 widget 的参数（可选），键名同上
--- statusbar.config.widgetConfig.kaon = {compact = true}
+-- statusbar.config.widgetConfig.kaon = {warnRatio = 0.5}
 statusbar.start()
 
 -- Show success message

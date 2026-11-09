@@ -70,12 +70,15 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
   - `statusbar/battery.lua` — timer-driven example (`interval = 30`), present in `statusbar/`
     but commented out of `config.widgets`. `hs.battery.timeRemaining()` returns `-1` while macOS
     is still calculating and `-2` on AC power; both mean "no estimate".
-  - `statusbar/kaon.lua` — Kaon Router spend against the daily budget, over the Admin API at
+  - `statusbar/kaon.lua` — today's Kaon Router spend, over the Admin API at
     `kaon-router-admin-api.kaonai.com/api/v1`. The `kaon_pat_*` token is read once from
     `~/.config/kaon/token` (mode 600, outside this repo so it cannot be committed) and never
     printed; only HTTP status codes reach the tooltip, never a response body. Needs the
     `usage:read` scope — Kaon's write scopes explicitly do not imply usage, stats or audit
-    access, so a token without it returns 403 forever.
+    access, so a token without it returns 403 forever. The title carries the spend alone: the
+    daily budget never changes, so repeating it there spends menu-bar width on no information,
+    and it still appears in the tooltip and the dropdown. The budget is what the title's amber
+    and red thresholds are a fraction of.
     Two sources disagree and the widget deliberately shows both: `/users/me/budget` is
     authoritative for today (it is the counter the console's /keys banner shows and the one that
     gates requests), while `/usage/summary` is Prometheus-derived and read ~8 USD higher for the

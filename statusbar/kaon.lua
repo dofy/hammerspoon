@@ -32,9 +32,8 @@ M.config = {
     baseURL = "https://kaon-router-admin-api.kaonai.com/api/v1",
     -- File holding the kaon_pat_* token, read once at start(). Keep it at 600.
     tokenPath = os.getenv("HOME") .. "/.config/kaon/token",
-    -- Title shows spend only, without "/<budget>".
-    compact = false,
-    -- Fractions of the daily budget at which the title changes colour.
+    -- Fractions of the daily budget at which the title changes colour. The
+    -- budget itself is not in the title, only in the tooltip and the dropdown.
     warnRatio = 0.7,
     critRatio = 0.9,
     -- Refresh the (heavier) usage breakdown every N timer ticks. 6 * 300s = 30m.
@@ -202,12 +201,10 @@ function M.render(ctx)
 
     local spend = budget.personal_daily_spend_usd or 0
     local cap = budget.personal_daily_budget_usd
-    local text
-    if ctx.config.compact or not cap then
-        text = string.format("$%.0f", spend)
-    else
-        text = string.format("$%.0f/%.0f", spend, cap)
-    end
+    -- Today's spend alone. The menu bar on this machine is already full, and
+    -- the budget never changes, so repeating it in every item costs width for
+    -- no information; the tooltip and the dropdown still carry it.
+    local text = string.format("$%.0f", spend)
 
     local tip = {string.format("今日 $%.2f", spend)}
     if cap then
