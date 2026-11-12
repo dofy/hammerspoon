@@ -32,7 +32,7 @@ statusbar.config.widgets = {
 -- 等宽标题：金额位数变化时菜单栏宽度不跳。本机只有 Menlo / Monaco / MesloLGS NF
 -- 三个等宽字体通过 hs.styledtext.validFont，"SF Mono" 不通过。
 -- 图标走 statusbar/kaon.svg（控制台自己的 favicon），文本只用等宽字体。
-statusbar.config.widgetConfig.kaon = { font = { name = "Menlo", size = 13 } }
+statusbar.config.widgetConfig.kaon = { font = { name = "Menlo", size = 13 }, decimals = 1 }
 statusbar.start()
 
 -- Show success message
