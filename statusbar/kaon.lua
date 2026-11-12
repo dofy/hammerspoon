@@ -414,11 +414,20 @@ function M.menu(ctx)
                                budget.personal_weekly_budget_usd),
             disabled = true
         }
-        items[#items + 1] = {
-            title = budgetLine("本月", budget.monthly_spend_usd,
-                               budget.monthly_budget_usd),
-            disabled = true
-        }
+        -- The monthly pair is returned but not maintained for this account:
+        -- on 2026-11-12 it read budget = null, spend = 0 while today alone
+        -- was 33 USD. Show it only with a positive cap and a spend that is
+        -- not below today's, so an unused counter never reads as "$0 this month".
+        local monthCap = budget.monthly_budget_usd
+        local monthSpend = budget.monthly_spend_usd
+        if type(monthCap) == "number" and monthCap > 0 and
+            type(monthSpend) == "number" and
+            monthSpend >= (budget.personal_daily_spend_usd or 0) then
+            items[#items + 1] = {
+                title = budgetLine("本月", monthSpend, monthCap),
+                disabled = true
+            }
+        end
         if type(budget.hard_limit_usd) == "number" then
             items[#items + 1] = {
                 title = "硬上限  " .. money(budget.hard_limit_usd),

@@ -122,6 +122,9 @@ choices go in `init.local.lua`, never in `init.lua`. When adding a module, add i
     same date on 2026-11-09. The breakdown uses `range=7d`; `range=24h` is unusable, returning
     five one-minute buckets instead of a day, and there is therefore no by_model breakdown for
     today alone. `source=starrocks` is a T+1 warehouse whose newest bucket is yesterday.
+    `/users/me/budget` also returns `monthly_budget_usd` / `monthly_spend_usd`, but they are not
+    maintained for this account (null cap and 0 spend while today was 33 USD, 2026-11-12). The
+    `本月` row therefore appears only with a positive cap and a spend not below today's.
     The dropdown breaks the range down by model, by inference key and by provider.
     `by_provider.total_requests` is 0 for every provider while its cost is populated, so the
     provider rows show cost only; `by_model` and `by_key` both carry usable counts.
