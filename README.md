@@ -27,6 +27,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 
 ```
 init.lua          # entry point: loads modules, binds reload hotkey, starts the path watcher
+init.local.example.lua # template for init.local.lua (git-ignored per-machine overrides, auto-created)
 mouse-follow.lua  # mouse-follow module (config + start/stop/toggle)
 keystats.lua      # shortcut-usage collector (writes ~/.local/share/keystats/keystats.db)
 keystats/keystats # CLI over that database
@@ -182,17 +183,17 @@ Toggle it at runtime with `mouseFollow.toggle()`.
 
 ### Statusbar
 
-`init.lua` is the only file to edit. The widget list is also the on/off switch — a name in it
-runs, a name commented out does not:
+Widgets are a per-machine choice, set in the git-ignored `init.local.lua`; `init.lua` mounts
+none. The widget list is also the on/off switch — a name in it runs, a name commented out does
+not:
 
 ```lua
-local statusbar = require("statusbar")
-statusbar.config.widgets = {
+local modules = ...
+modules.statusbar.config.widgets = {
     "kaon",
     -- "battery",
 }
-statusbar.config.widgetConfig.battery = {lowThreshold = 15}
-statusbar.start()
+modules.statusbar.config.widgetConfig.battery = {lowThreshold = 15}
 ```
 
 Saving the file reloads Hammerspoon, so the change takes effect immediately. There is no runtime
@@ -235,11 +236,11 @@ rather than set as an icon plus a title, because AppKit reserves about 17pt betw
 `hs.menubar` cannot shrink it; the item is 69pt wide against 51pt of content, and the remaining
 18pt is AppKit's own padding.
 
-Everything about the text is configurable from `init.lua`, under
-`statusbar.config.widgetConfig.kaon`:
+Everything about the text is configurable from `init.local.lua`, under
+`modules.statusbar.config.widgetConfig.kaon`:
 
 ```lua
-statusbar.config.widgetConfig.kaon = {
+modules.statusbar.config.widgetConfig.kaon = {
     font = {name = "Menlo", size = 13}, -- monospace: the width stops jumping
     decimals = 0,                       -- 0..4 on the amount
     showBudget = false,                 -- "$46 / $100" instead of "$46"

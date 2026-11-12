@@ -3,3 +3,6 @@
 
 # Python bytecode
 __pycache__/
+
+# Per-machine overrides (generated from init.local.example.lua)
+init.local.lua

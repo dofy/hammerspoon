@@ -21,7 +21,16 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 
 ## Architecture
 
-`init.lua` is the entry point Hammerspoon loads. It `require`s modules, configures them via their `.config` table, then calls `.start()`.
+`init.lua` is the entry point Hammerspoon loads. It `require`s modules, configures them via their `.config` table, runs `init.local.lua`, then calls `.start()`.
+
+**Per-machine overrides:** `init.local.lua` is git-ignored and holds anything one machine wants
+differently. `init.lua` copies it from the tracked `init.local.example.lua` when it is missing,
+then runs it with the `modules` table as its argument, after the shared defaults are set and
+before any `start()`. It may change `modules.<name>.config` or set `modules.<name> = nil` to skip
+starting that module. A load or runtime error in it is caught: it is printed to the Console with
+an alert, and the shared defaults still start. Shared defaults go in `init.lua`; machine-specific
+choices go in `init.local.lua`, never in `init.lua`. When adding a module, add it to both
+`modules` and `startOrder` in `init.lua`.
 
 **Module convention:** each `.lua` module returns a table `M` exposing a `M.config` table plus lifecycle functions `M.start()` / `M.stop()` / `M.toggle()`. `start()` must be idempotent (call `stop()` first if already running) and store event taps / window filters in module-private locals so `stop()` can tear them down. Follow this shape when adding modules.
 
@@ -54,8 +63,9 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
 - `statusbar.lua` — menu-bar host. Owns every `hs.menubar` item so individual widgets stay
   small: a widget declares what to show (`render`) and how often (`interval`), and the host
   creates the item, drives the timer and builds the dropdown. Widgets are files under
-  `statusbar/` named in `config.widgets`, which is set **only in `init.lua`** —
-  `statusbar.lua` deliberately ships an empty list so there is never a second place to look.
+  `statusbar/` named in `config.widgets`, which is set **only in `init.local.lua`** —
+  `statusbar.lua` ships an empty list and `init.lua` mounts nothing, because which widgets run
+  is a per-machine choice; a machine whose `init.local.lua` sets no list shows no items.
   That list is also the on/off switch: a name in it runs, a name commented out does not. There
   is no runtime toggle, no control item and nothing in `hs.settings`, so the file on disk is the
   whole truth about what is mounted and a reload is the only way to change it.
