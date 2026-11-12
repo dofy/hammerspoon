@@ -89,7 +89,7 @@ choices go in `init.local.lua`, never in `init.lua`. When adding a module, add i
     Address column can be empty, so fields are counted from the end of the `<Link#N>` row.
     `layout = "stacked"` (default) draws ↑ over ↓ into one template image in Menlo 9;
     `"inline"` is one line of text. Each line is coloured by its own rate through the
-    `config.colors` tiers (plain below 100K/s, then green, amber, red at 1M and 10M). Any
+    `config.colors` tiers (plain below 100K/s, then yellow, green and cyan at 1M and 10M: faster reads as better, and no tier is red because low throughput is not a fault). Any
     coloured line makes the stacked image non-template, so the plain line is then painted
     `config.plainColor` grey. The real menu-bar foreground is unreadable: the bar picks light or
     dark text from the wallpaper, and `hs.host.interfaceStyle()` reported Light while the bar

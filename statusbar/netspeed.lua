@@ -60,10 +60,12 @@ M.config = {
     -- exceeds the rate gives the colour. A tier without `below` catches the
     -- rest. `color = nil` keeps the menu-bar foreground. `false` = no colour.
     colors = {
-        {below = 100 * 1024, color = nil}, -- < 100K: plain
-        {below = 1024 * 1024, color = {red = 0.20, green = 0.78, blue = 0.35}}, -- < 1M: green
-        {below = 10 * 1024 * 1024, color = {red = 1.00, green = 0.62, blue = 0.04}}, -- < 10M: amber
-        {color = {red = 1.00, green = 0.27, blue = 0.23}} -- >= 10M: red
+        -- Faster reads as better: warm for a trickle, green and cyan for speed.
+        -- Low throughput is not a fault, so no tier uses red.
+        {below = 100 * 1024, color = nil}, -- < 100K: plain (idle)
+        {below = 1024 * 1024, color = {red = 1.00, green = 0.80, blue = 0.20}}, -- < 1M: yellow
+        {below = 10 * 1024 * 1024, color = {red = 0.20, green = 0.78, blue = 0.35}}, -- < 10M: green
+        {color = {red = 0.25, green = 0.80, blue = 0.95}} -- >= 10M: cyan
     },
     -- The plain line while the other line is coloured; see the note above.
     plainColor = {white = 0.6, alpha = 1}
