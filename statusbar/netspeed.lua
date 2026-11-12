@@ -21,6 +21,20 @@
 ---   is a `utun*`, which still carries the real traffic. A counter that goes
 ---   backwards (interface changed or reset) drops that sample instead of
 ---   showing a negative or huge rate.
+---
+--- Colour:
+---   Each line is coloured by its own rate through `config.colors`, a list of
+---   `{below = bytes/s, color = ...}` tiers checked in order; the first tier
+---   whose `below` exceeds the rate wins, and `color = nil` means the plain
+---   menu-bar foreground. While both lines are plain the stacked image stays a
+---   template, so macOS tints it. Once either line is coloured the image can no
+---   longer be a template (macOS would tint the colour away), so the plain
+---   line is painted `config.plainColor`, a mid grey readable on both a light
+---   and a dark bar. The real menu-bar foreground cannot be read:
+---   `hs.host.interfaceStyle()` reports the system appearance, but the bar
+---   picks light or dark text from the wallpaper behind it, and on 2026-11-12
+---   it drew light text while the system reported Light. `colors = false`
+---   turns colouring off.
 
 local M = {}
 
@@ -41,7 +55,18 @@ M.config = {
     font = {name = "Menlo", size = 9},
     inlineFont = {name = "Menlo", size = 12},
     -- Below this rate (bytes/s) the line reads as idle, not as noise like 0.1K.
-    idleBelow = 1024
+    idleBelow = 1024,
+    -- Rate tiers, checked in order: the first tier whose `below` (bytes/s)
+    -- exceeds the rate gives the colour. A tier without `below` catches the
+    -- rest. `color = nil` keeps the menu-bar foreground. `false` = no colour.
+    colors = {
+        {below = 100 * 1024, color = nil}, -- < 100K: plain
+        {below = 1024 * 1024, color = {red = 0.20, green = 0.78, blue = 0.35}}, -- < 1M: green
+        {below = 10 * 1024 * 1024, color = {red = 1.00, green = 0.62, blue = 0.04}}, -- < 10M: amber
+        {color = {red = 1.00, green = 0.27, blue = 0.23}} -- >= 10M: red
+    },
+    -- The plain line while the other line is coloured; see the note above.
+    plainColor = {white = 0.6, alpha = 1}
 }
 
 -- Private state
@@ -75,6 +100,16 @@ local function rateText(bps)
     end
     local fmt = v < 10 and "%4.1f%s" or "%4.0f%s"
     return string.format(fmt, v, units[i])
+end
+
+-- Colour for one line, or nil for the plain menu-bar foreground.
+local function rateColor(bps, tiers)
+    if not tiers then return nil end
+    bps = bps or 0
+    for _, tier in ipairs(tiers) do
+        if tier.below == nil or bps < tier.below then return tier.color end
+    end
+    return nil
 end
 
 local function bytesText(n)
@@ -147,13 +182,16 @@ local function sample(ctx)
     end
 end
 
--- Two monospace lines in one template image. macOS tints the alpha mask to
--- the menu-bar foreground colour, which handles light/dark mode.
-local function stackedImage(up, down)
+-- Two monospace lines in one image. With no colour it is a template: macOS
+-- tints the alpha mask to the menu-bar foreground, which handles light/dark
+-- mode. With a colour on either line the caller must not mark it a template.
+local function stackedImage(up, down, upColor, downColor)
     local font = M.config.font
-    local attrs = {font = font, color = {white = 0, alpha = 1}}
-    local top = hs.styledtext.new("↑" .. up, attrs)
-    local bottom = hs.styledtext.new("↓" .. down, attrs)
+    local plain = (upColor or downColor) and M.config.plainColor or
+                      {white = 0, alpha = 1}
+    local top = hs.styledtext.new("↑" .. up, {font = font, color = upColor or plain})
+    local bottom = hs.styledtext.new("↓" .. down,
+                                     {font = font, color = downColor or plain})
     local a = hs.drawing.getTextDrawingSize(top)
     local b = hs.drawing.getTextDrawingSize(bottom)
     local w = math.ceil(math.max(a.w, b.w)) + 1
@@ -194,14 +232,27 @@ function M.render(ctx)
                                       (up:gsub("^%s+", "")),
                                       (down:gsub("^%s+", "")))
 
+    local tiers = ctx.config.colors or nil
+    local upColor = rateColor(rate and rate.tx, tiers)
+    local downColor = rateColor(rate and rate.rx, tiers)
+
     if ctx.config.layout == "inline" then
-        local text = string.format("↓%s ↑%s", down, up)
+        local function part(text, color)
+            local attrs = {font = ctx.config.inlineFont}
+            if color then attrs.color = color end
+            return hs.styledtext.new(text, attrs)
+        end
         return {
-            title = hs.styledtext.new(text, {font = ctx.config.inlineFont}),
+            title = part("↓" .. down, downColor) .. part(" ") ..
+                part("↑" .. up, upColor),
             tooltip = tooltip
         }
     end
-    return {icon = stackedImage(up, down), template = true, tooltip = tooltip}
+    return {
+        icon = stackedImage(up, down, upColor, downColor),
+        template = upColor == nil and downColor == nil,
+        tooltip = tooltip
+    }
 end
 
 function M.menu(ctx)

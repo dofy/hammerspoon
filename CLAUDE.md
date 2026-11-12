@@ -88,7 +88,12 @@ choices go in `init.local.lua`, never in `init.lua`. When adding a module, add i
     still carries the real traffic); a counter that goes backwards drops the sample. netstat's
     Address column can be empty, so fields are counted from the end of the `<Link#N>` row.
     `layout = "stacked"` (default) draws ↑ over ↓ into one template image in Menlo 9;
-    `"inline"` is one line of text.
+    `"inline"` is one line of text. Each line is coloured by its own rate through the
+    `config.colors` tiers (plain below 100K/s, then green, amber, red at 1M and 10M). Any
+    coloured line makes the stacked image non-template, so the plain line is then painted
+    `config.plainColor` grey. The real menu-bar foreground is unreadable: the bar picks light or
+    dark text from the wallpaper, and `hs.host.interfaceStyle()` reported Light while the bar
+    drew light text.
   - `statusbar/kaon.lua` — today's Kaon Router spend, over the Admin API at
     `kaon-router-admin-api.kaonai.com/api/v1`. The `kaon_pat_*` token is read once from
     `~/.config/kaon/token` (mode 600, outside this repo so it cannot be committed) and never
