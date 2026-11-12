@@ -70,6 +70,15 @@ Personal [Hammerspoon](https://www.hammerspoon.org/) configuration — Lua scrip
   - `statusbar/battery.lua` — timer-driven example (`interval = 30`), present in `statusbar/`
     but commented out of `config.widgets`. `hs.battery.timeRemaining()` returns `-1` while macOS
     is still calculating and `-2` on AC power; both mean "no estimate".
+  - `statusbar/netspeed.lua` — live up/down rate of the primary interface, from the byte
+    delta between two `netstat -ibn -I <iface>` samples run as `hs.task`. It sets
+    `interval = nil` and samples on its own timer: if `render` started the sample, each
+    `ctx.update()` from the sample callback would start another. The interface follows
+    `hs.network.primaryInterfaces()` on every sample (a `utun*` under a TUN-mode proxy, which
+    still carries the real traffic); a counter that goes backwards drops the sample. netstat's
+    Address column can be empty, so fields are counted from the end of the `<Link#N>` row.
+    `layout = "stacked"` (default) draws ↑ over ↓ into one template image in Menlo 9;
+    `"inline"` is one line of text.
   - `statusbar/kaon.lua` — today's Kaon Router spend, over the Admin API at
     `kaon-router-admin-api.kaonai.com/api/v1`. The `kaon_pat_*` token is read once from
     `~/.config/kaon/token` (mode 600, outside this repo so it cannot be committed) and never

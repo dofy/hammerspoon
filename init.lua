@@ -24,6 +24,7 @@ require("hs.ipc")
 local statusbar = require("statusbar")
 statusbar.config.widgets = {
     "kaon",
+    "netspeed",
     -- "battery",
 }
 -- 覆盖单个 widget 的参数（可选），键名同上
