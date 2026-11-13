@@ -227,6 +227,18 @@ local function places(n)
     return math.max(0, math.min(4, math.floor(n)))
 end
 
+-- Every title goes through here so the font applies to the placeholders too,
+-- not only to the amber/red spend. A plain string is returned when there is
+-- nothing to style, because styledtext is userdata and costs more to build.
+local function styled(text, color)
+    local font = M.config.font
+    if not font and not color then return text end
+    local attrs = {}
+    if font then attrs.font = font end
+    if color then attrs.color = color end
+    return hs.styledtext.new(text, attrs)
+end
+
 -- Icon and text in one image, so the item is only as wide as its content.
 -- A template image is tinted whole by macOS, which is what carries the icon
 -- *and* the text through a light/dark switch; `color` is therefore only set
@@ -287,18 +299,6 @@ local function titleFields(text, color)
         return {icon = img, template = M.config.iconTemplate and color == nil}
     end
     return {title = styled(text, color)}
-end
-
--- Every title goes through here so the font applies to the placeholders too,
--- not only to the amber/red spend. A plain string is returned when there is
--- nothing to style, because styledtext is userdata and costs more to build.
-local function styled(text, color)
-    local font = M.config.font
-    if not font and not color then return text end
-    local attrs = {}
-    if font then attrs.font = font end
-    if color then attrs.color = color end
-    return hs.styledtext.new(text, attrs)
 end
 
 local function expiryNote()
