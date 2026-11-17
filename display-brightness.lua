@@ -9,7 +9,7 @@ local screenWatcher, restoreTimers, connected, revisions = nil, {}, {}, {}
 local generation = 0
 local alertID
 local panel, panelTimer
-local maximums = {}
+local ddc = {} -- uuid -> { value, written, target, max, pending }
 local settingsKey = "display-brightness.saved-v1"
 local saved = {}
 local notify
@@ -118,12 +118,54 @@ local function run(args, callback, epoch, uuid)
     end)
 end
 
+local function clamp(value, maximum)
+    return math.max(0, math.min(maximum or 100, value))
+end
+
+-- Read the current DDC value and maximum once per connection. A monitor that is still
+-- applying a write answers a read with 0, so a 0 is re-read once before it is trusted.
+local function learn(uuid, target, epoch, callback)
+    local function readValue(retried)
+        run({ "display", target, "get", "luminance" }, function(code, output)
+            local value = code == 0 and output and tonumber(output:match("^%s*(%d+)%s*$"))
+            if value == 0 and not retried then
+                local wait = {}
+                wait.timer = hs.timer.doAfter(0.3, function()
+                    if epoch ~= generation or active ~= wait then return end
+                    active = nil
+                    readValue(true)
+                end)
+                active = wait -- hold the queue while waiting
+                return
+            end
+            if not value then callback(nil); return end
+            run({ "display", target, "max", "luminance" }, function(maxCode, maxOutput)
+                local maximum = maxCode == 0 and maxOutput and tonumber(maxOutput:match("^%s*(%d+)%s*$"))
+                maximum = maximum and maximum > 0 and maximum or 100
+                -- A garbled reply (25600 = 100 in the high byte, seen after toggling HDR)
+                -- is above the maximum; never build a target on it.
+                if value > maximum then callback(nil); return end
+                callback(value, maximum)
+            end, epoch, uuid)
+        end, epoch, uuid)
+    end
+    readValue(false)
+end
+
+local function queued(uuid)
+    for _, entry in ipairs(queue) do
+        if entry.uuid == uuid and entry.sync then return true end
+    end
+    return false
+end
+
 processQueue = function()
     if active or #queue == 0 then return end
     local item = table.remove(queue, 1)
     if item.restore and (revisions[item.uuid] or 0) ~= item.revision then processQueue(); return end
     local screen = hs.screen.find(item.uuid)
     if not screen or screen:getUUID():upper() ~= item.uuid:upper() then
+        ddc[item.uuid] = nil
         notify("目标显示器已断开，未调整", item.uuid)
         processQueue(); return
     end
@@ -145,39 +187,62 @@ processQueue = function()
     if item.restore and item.restore.mode ~= "ddc" then processQueue(); return end
     local epoch = generation
     local target = "uuid=" .. item.uuid
-    local operation = item.restore and "set" or "chg"
-    local parameter = item.restore and item.restore.value or item.delta
-    run({ "display", target, operation, "luminance", tostring(parameter) }, function(code, output)
+    local state = ddc[item.uuid]
+    if not state then state = { pending = 0 }; ddc[item.uuid] = state end
+    if item.restore then
+        state.target = clamp(item.restore.value, state.max or 65535)
+        state.restoring = true
+    end
+
+    if not item.restore and not state.value then
+        learn(item.uuid, target, epoch, function(value, maximum)
+            if ddc[item.uuid] ~= state then processQueue(); return end
+            if not value then
+                ddc[item.uuid] = nil
+                notify(name .. " DDC 读取亮度失败", item.uuid)
+                processQueue(); return
+            end
+            state.value, state.written, state.max = value, value, maximum
+            state.target = clamp(value + state.pending, maximum)
+            state.pending = 0
+            showBrightness(item.uuid, name, state.target, maximum)
+            table.insert(queue, 1, { uuid = item.uuid, sync = true })
+            processQueue()
+        end)
+        return
+    end
+
+    -- Always write an absolute value: `chg` reads before it writes, and a read during a
+    -- previous write returns 0, which turned +5 into a jump to 5.
+    if state.target == nil or state.target == state.written then processQueue(); return end
+    local value = state.target
+    run({ "display", target, "set", "luminance", tostring(value) }, function(code, output)
         if code == -2 then
             notify("未找到 m1ddc；请安装或设置本机路径", item.uuid)
             processQueue(); return
         end
-        local requested = output and tonumber(output:match("Writing%s+(%d+)"))
-        if code ~= 0 or not requested then
-            notify(name .. " DDC 调整失败或状态未确认", item.uuid)
+        if ddc[item.uuid] ~= state then processQueue(); return end
+        local written = output and tonumber(output:match("Writing%s+(%d+)"))
+        if code ~= 0 or written ~= value then
+            ddc[item.uuid] = nil -- re-read the monitor on the next press
+            notify(name .. " DDC 调整失败", item.uuid)
             processQueue(); return
         end
-        run({ "display", target, "get", "luminance" }, function(readCode, readOutput)
-            local actual = readOutput and tonumber(readOutput:match("^%s*(%d+)%s*$"))
-            if readCode ~= 0 or actual ~= requested then
-                notify(name .. " DDC 亮度未确认", item.uuid)
-            else
-                if not item.restore then remember(item.uuid, "ddc", actual) end
-                if maximums[item.uuid] then
-                    showBrightness(item.uuid, name, actual, maximums[item.uuid])
-                    processQueue()
-                    return
-                end
-                run({ "display", target, "max", "luminance" }, function(maxCode, maxOutput)
-                    local maximum = maxOutput and tonumber(maxOutput:match("^%s*(%d+)%s*$"))
-                    if maxCode == 0 and maximum and maximum > 0 then maximums[item.uuid] = maximum end
-                    showBrightness(item.uuid, name, actual, maximums[item.uuid])
-                    processQueue()
-                end, epoch, item.uuid)
-                return
+        if state.restoring then
+            -- Forget the value but keep presses made during the restore: the next
+            -- sync re-reads the monitor (and its maximum) and applies them on top.
+            state.restoring, state.value, state.written = nil, nil, nil
+            if state.pending ~= 0 and not queued(item.uuid) then
+                table.insert(queue, 1, { uuid = item.uuid, sync = true })
             end
-            processQueue()
-        end, epoch, item.uuid)
+            processQueue(); return
+        end
+        state.written, state.value = value, value
+        remember(item.uuid, "ddc", value)
+        if state.target ~= state.written then
+            table.insert(queue, 1, { uuid = item.uuid, sync = true })
+        end
+        processQueue()
     end, epoch, item.uuid)
 end
 
@@ -187,7 +252,21 @@ function M.adjustMouseScreen(delta)
     if not uuid then notify("无法识别鼠标所在的显示器"); return end
     revisions[uuid] = (revisions[uuid] or 0) + 1
     if restoreTimers[uuid] then restoreTimers[uuid]:stop(); restoreTimers[uuid] = nil end
-    queue[#queue + 1] = { uuid = uuid, delta = delta }
+    if type(screen:getBrightness()) == "number" then
+        queue[#queue + 1] = { uuid = uuid, delta = delta }
+    else
+        -- DDC: move the target at once and show it; the queue writes only the latest
+        -- target, so a burst of presses becomes one or two writes instead of one each.
+        local state = ddc[uuid]
+        if not state then state = { pending = 0 }; ddc[uuid] = state end
+        if state.value then
+            state.target = clamp((state.target or state.value) + delta, state.max)
+            showBrightness(uuid, screen:name() or "显示器", state.target, state.max)
+        else
+            state.pending = state.pending + delta
+        end
+        if not queued(uuid) then queue[#queue + 1] = { uuid = uuid, sync = true } end
+    end
     local epoch = generation
     hs.timer.doAfter(0, function() if epoch == generation then processQueue() end end)
 end
@@ -212,7 +291,7 @@ local function screenChanged()
     local current = screenSet()
     for uuid in pairs(connected) do
         if not current[uuid] then
-            maximums[uuid] = nil
+            ddc[uuid] = nil
             revisions[uuid] = (revisions[uuid] or 0) + 1
             if restoreTimers[uuid] then restoreTimers[uuid]:stop(); restoreTimers[uuid] = nil end
         end
@@ -279,7 +358,7 @@ function M.stop()
     restoreTimers, connected, revisions = {}, {}, {}
     if panelTimer then panelTimer:stop(); panelTimer = nil end
     if panel then panel:delete(); panel = nil end
-    maximums = {}
+    ddc = {}
     if alertID then hs.alert.closeSpecific(alertID, 0); alertID = nil end
     for _, key in ipairs(hotkeys) do key:delete() end
     hotkeys = {}
