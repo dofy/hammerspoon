@@ -4,6 +4,10 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 
 ## Features
 
+- **Display brightness** (`display-brightness.lua`) — brightness keys, F1/F2, Scroll Lock/Pause (F14/F15), and ⌃⌥⌘[ / ] change the hardware brightness of the display under the mouse by 5. Native display brightness uses macOS APIs; external DDC displays use `m1ddc` by UUID. Commands are serialized and the display is chosen when the key is pressed. A single brightness panel follows the adjusted display and updates with each change. Other modified keys retain their normal behavior.
+
+  The module checks `/opt/homebrew/bin/m1ddc` and `/usr/local/bin/m1ddc` and warns if neither exists; it never installs dependencies. Set `modules.displayBrightness.config.cli` to an absolute path in `init.local.lua` for a different install. Each machine stores its own successfully verified brightness values in Hammerspoon settings by display UUID. A reconnected display is restored after a three-second settling delay; a manual adjustment during the delay takes priority. Existing displays are not changed on Hammerspoon reload. Restoration requires the same UUID and working native or DDC read/write support.
+
 - **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
 - **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
 - **Statusbar** (`statusbar.lua`) — a menu-bar host: small widget files under `statusbar/` say what to show and how often, and the host creates the status item, drives the refresh and builds the dropdown. Ships with a Kaon Router spend readout and a battery readout.
