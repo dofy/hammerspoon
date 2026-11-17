@@ -105,7 +105,6 @@ local function run(args, callback, epoch, uuid)
         callback(code, out)
     end, args)
     if not command then callback(-1, ""); return end
-    job.command = command
     active = job
     if not command:start() then active = nil; callback(-1, ""); return end
     job.timer = hs.timer.doAfter(M.config.timeout, function()
@@ -119,7 +118,19 @@ local function run(args, callback, epoch, uuid)
 end
 
 local function clamp(value, maximum)
-    return math.max(0, math.min(maximum or 100, value))
+    return math.max(0, math.min(maximum, value))
+end
+
+local function ddcState(uuid)
+    ddc[uuid] = ddc[uuid] or { pending = 0 }
+    return ddc[uuid]
+end
+
+local function queueSync(uuid, front)
+    for _, entry in ipairs(queue) do
+        if entry.uuid == uuid and entry.sync then return end
+    end
+    table.insert(queue, front and 1 or #queue + 1, { uuid = uuid, sync = true })
 end
 
 -- Read the current DDC value and maximum once per connection. A monitor that is still
@@ -152,13 +163,6 @@ local function learn(uuid, target, epoch, callback)
     readValue(false)
 end
 
-local function queued(uuid)
-    for _, entry in ipairs(queue) do
-        if entry.uuid == uuid and entry.sync then return true end
-    end
-    return false
-end
-
 processQueue = function()
     if active or #queue == 0 then return end
     local item = table.remove(queue, 1)
@@ -185,16 +189,20 @@ processQueue = function()
         processQueue(); return
     end
     if item.restore and item.restore.mode ~= "ddc" then processQueue(); return end
+    if not findCLI() then
+        ddc[item.uuid] = nil
+        notify("未找到 m1ddc；请安装或设置本机路径", item.uuid)
+        processQueue(); return
+    end
     local epoch = generation
     local target = "uuid=" .. item.uuid
-    local state = ddc[item.uuid]
-    if not state then state = { pending = 0 }; ddc[item.uuid] = state end
+    local state = ddcState(item.uuid)
     if item.restore then
-        state.target = clamp(item.restore.value, state.max or 65535)
-        state.restoring = true
+        if state.value then state.target = clamp(item.restore.value, state.max)
+        else state.restoreTo = item.restore.value end
     end
 
-    if not item.restore and not state.value then
+    if not state.value then
         learn(item.uuid, target, epoch, function(value, maximum)
             if ddc[item.uuid] ~= state then processQueue(); return end
             if not value then
@@ -203,10 +211,10 @@ processQueue = function()
                 processQueue(); return
             end
             state.value, state.written, state.max = value, value, maximum
-            state.target = clamp(value + state.pending, maximum)
-            state.pending = 0
-            showBrightness(item.uuid, name, state.target, maximum)
-            table.insert(queue, 1, { uuid = item.uuid, sync = true })
+            state.target = clamp(state.restoreTo or value + state.pending, maximum)
+            state.restoreTo, state.pending = nil, 0
+            if not item.restore then showBrightness(item.uuid, name, state.target, maximum) end
+            queueSync(item.uuid, true)
             processQueue()
         end)
         return
@@ -214,13 +222,9 @@ processQueue = function()
 
     -- Always write an absolute value: `chg` reads before it writes, and a read during a
     -- previous write returns 0, which turned +5 into a jump to 5.
-    if state.target == nil or state.target == state.written then processQueue(); return end
+    if state.target == state.written then processQueue(); return end
     local value = state.target
     run({ "display", target, "set", "luminance", tostring(value) }, function(code, output)
-        if code == -2 then
-            notify("未找到 m1ddc；请安装或设置本机路径", item.uuid)
-            processQueue(); return
-        end
         if ddc[item.uuid] ~= state then processQueue(); return end
         local written = output and tonumber(output:match("Writing%s+(%d+)"))
         if code ~= 0 or written ~= value then
@@ -228,20 +232,9 @@ processQueue = function()
             notify(name .. " DDC 调整失败", item.uuid)
             processQueue(); return
         end
-        if state.restoring then
-            -- Forget the value but keep presses made during the restore: the next
-            -- sync re-reads the monitor (and its maximum) and applies them on top.
-            state.restoring, state.value, state.written = nil, nil, nil
-            if state.pending ~= 0 and not queued(item.uuid) then
-                table.insert(queue, 1, { uuid = item.uuid, sync = true })
-            end
-            processQueue(); return
-        end
         state.written, state.value = value, value
         remember(item.uuid, "ddc", value)
-        if state.target ~= state.written then
-            table.insert(queue, 1, { uuid = item.uuid, sync = true })
-        end
+        if state.target ~= value then queueSync(item.uuid, true) end
         processQueue()
     end, epoch, item.uuid)
 end
@@ -257,15 +250,14 @@ function M.adjustMouseScreen(delta)
     else
         -- DDC: move the target at once and show it; the queue writes only the latest
         -- target, so a burst of presses becomes one or two writes instead of one each.
-        local state = ddc[uuid]
-        if not state then state = { pending = 0 }; ddc[uuid] = state end
+        local state = ddcState(uuid)
         if state.value then
-            state.target = clamp((state.target or state.value) + delta, state.max)
+            state.target = clamp(state.target + delta, state.max)
             showBrightness(uuid, screen:name() or "显示器", state.target, state.max)
         else
-            state.pending = state.pending + delta
+            state.pending, state.restoreTo = state.pending + delta, nil -- a press overrides a restore
         end
-        if not queued(uuid) then queue[#queue + 1] = { uuid = uuid, sync = true } end
+        queueSync(uuid)
     end
     local epoch = generation
     hs.timer.doAfter(0, function() if epoch == generation then processQueue() end end)
