@@ -29,7 +29,7 @@ local modules = ...
 
 -- 按键提示：默认关闭，用 ⌃⌥⌘K 开关。取消注释并按需修改。
 -- modules.keycast.config.hotkey = { mods = { "ctrl", "alt", "cmd" }, key = "k" }
--- modules.keycast.config.target = "focused" -- focused：活动窗口；mouse：鼠标下的窗口
+-- modules.keycast.config.target = "focused" -- focused：活动窗口；mouse：鼠标下的窗口；mouseScreen：鼠标所在屏幕
 -- modules.keycast.config.position = "bottomLeft" -- topLeft / topRight / bottomLeft / bottomRight / center
 -- modules.keycast.config.margin = 24
 -- modules.keycast.config.types = { shortcuts = true, text = false, special = true, mouse = false }
@@ -40,5 +40,7 @@ local modules = ...
 -- modules.keycast.config.fadeDuration = 0.2
 -- modules.keycast.config.moveDuration = 0.15
 -- modules.keycast.config.maxRows = 6
+-- modules.keycast.config.textKeyMode = "physical" -- input：输入法字符；physical：美式键盘物理键位
+-- modules.keycast.config.repeatMode = "badge" -- normal：逐个显示；badge：连续重复显示右上角次数
 -- modules.keycast.config.maxTextLength = 200
 -- modules.keycast.config.enabled = true -- 重载后自动开启；会展示允许的输入

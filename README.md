@@ -8,6 +8,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 
   The module checks `/opt/homebrew/bin/m1ddc` and `/usr/local/bin/m1ddc` and warns if neither exists; it never installs dependencies. Set `modules.displayBrightness.config.cli` to an absolute path in `init.local.lua` for a different install. Each machine stores its own successfully verified brightness values in Hammerspoon settings by display UUID. A reconnected display is restored after a three-second settling delay; a manual adjustment during the delay takes priority. Existing displays are not changed on Hammerspoon reload. Restoration requires the same UUID and working native or DDC read/write support.
 
+- **Keycast** (`keycast.lua`) — optionally shows recent keys and shortcuts on screen, with independent fading lines, mouse-screen positioning, and repeat-count badges. Toggle with ⌃⌥⌘K.
 - **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
 - **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
 - **Statusbar** (`statusbar.lua`) — a menu-bar host: small widget files under `statusbar/` say what to show and how often, and the host creates the status item, drives the refresh and builds the dropdown. Ships with a Kaon Router spend readout and a battery readout.
@@ -33,6 +34,7 @@ My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automa
 init.lua          # entry point: loads modules, binds reload hotkey, starts the path watcher
 init.local.example.lua # template for init.local.lua (git-ignored per-machine overrides, auto-created)
 mouse-follow.lua  # mouse-follow module (config + start/stop/toggle)
+keycast.lua       # optional on-screen keystroke visualizer
 keystats.lua      # shortcut-usage collector (writes ~/.local/share/keystats/keystats.db)
 keystats/keystats # CLI over that database
 keystats/server.py# live dashboard server (`keystats serve`)
@@ -316,10 +318,25 @@ as its tooltip, and the other widgets keep running.
 
 `keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press **⌃⌥⌘K** to toggle it. It does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
 
-- `target`: `focused` anchors to the focused window, `mouse` to the frontmost standard window under the pointer. If no window is found, the pointer's screen is used.
+For a screen-corner overlay with physical key labels and repeat badges, add this to `init.local.lua`:
+
+```lua
+modules.keycast.config.enabled = true
+modules.keycast.config.target = "mouseScreen"
+modules.keycast.config.position = "bottomLeft"
+modules.keycast.config.types = { shortcuts = true, text = true, special = true, mouse = false }
+modules.keycast.config.textKeyMode = "physical"
+modules.keycast.config.repeatMode = "badge"
+```
+
+The watcher reloads the configuration when the file is saved. The default text sequence interval is 0.5 seconds; each line remains for 2 seconds and fades over 0.2 seconds. A new line appears below older lines, which move upward.
+
+- `target`: `focused` anchors to the focused window, `mouse` to the frontmost standard window under the pointer, and `mouseScreen` to the pointer's screen without following a window. If no window is found, the pointer's screen is used. The `mouse` window mode may miss accessory apps and nonstandard panels.
 - `position`: `bottomLeft`, `bottomRight`, `topLeft`, `topRight`, or `center`; `margin` controls the inset in points. The overlay is clamped to the visible screen.
 - `types`: independently enable `shortcuts` (⌘/⌥/⌃ combinations), `text`, `special` (navigation, function keys, space, etc.), and `mouse`. Shift-only characters count as text.
 - When `text` is enabled, printable keys accumulate until `sequenceDelay` seconds of inactivity or another displayed action; a shortcut also clears the sequence when shortcuts are filtered out. A space or punctuation ends the line after being appended; older lines move up and fade after `linger`. Space appears as ␣. Long sequences keep their most recent characters visible and retain at most `maxTextLength` Unicode code points.
-- `hotkey`, `colors`, `fontSize`, `sequenceDelay`, `linger`, `fadeDuration`, `moveDuration`, `maxRows`, `maxTextLength`, and startup `enabled` are configurable. Set `hotkey = nil` to omit the binding.
+- `textKeyMode = "physical"` shows ordinary keys using US ANSI key positions, independent of the input method; `"input"` (default) displays characters reported by the current input method. Physical mode omits unmapped keys and does not represent the final IME composition. Shortcut and special-key display are unchanged.
+- `repeatMode = "badge"` groups consecutive identical characters or actions within `sequenceDelay`, showing a superscript count (e.g. `a³`, `⌫³`). The default `"normal"` displays every input separately.
+- `hotkey`, `colors`, `fontSize`, `sequenceDelay`, `linger`, `fadeDuration`, `moveDuration`, `maxRows`, `textKeyMode`, `repeatMode`, `maxTextLength`, and startup `enabled` are configurable. Set `hotkey = nil` to omit the binding.
 
 The overlay joins Spaces and supports full-screen windows. macOS Secure Input prevents keyboard events from reaching Hammerspoon. Text shows key events, not necessarily the final text committed by an input method; enabling text can expose sensitive input during screen sharing.

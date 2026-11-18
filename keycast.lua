@@ -3,7 +3,7 @@ local M = {}
 M.config = {
     enabled = false,
     hotkey = { mods = { "ctrl", "alt", "cmd" }, key = "k" },
-    target = "focused", -- focused | mouse
+    target = "focused", -- focused | mouse | mouseScreen
     position = "bottomLeft", -- topLeft | topRight | bottomLeft | bottomRight | center
     margin = 24,
     types = { shortcuts = true, text = false, special = true, mouse = false },
@@ -12,6 +12,8 @@ M.config = {
     fadeDuration = 0.2,
     moveDuration = 0.15,
     maxRows = 6,
+    repeatMode = "normal", -- normal | badge
+    textKeyMode = "input", -- input | physical (US ANSI positions)
     maxTextLength = 200, -- maximum Unicode code points kept in memory
     fontSize = 42,
     colors = { background = { white = 0, alpha = 0.8 }, text = { white = 1, alpha = 1 } },
@@ -19,13 +21,17 @@ M.config = {
 
 local tap, binding, watchdog, animationTimer
 local active = false
-local rows, currentTextRow = {}, nil
+local rows, currentTextRow, lastRepeatRow = {}, nil, nil
 local special = {
     return_ = "↩", ["return"] = "↩", tab = "⇥", space = "␣", delete = "⌫",
     forwarddelete = "⌦", padenter = "↩", padclear = "⌧", help = "?⃝", escape = "⎋", left = "←", right = "→", up = "↑", down = "↓",
     home = "↖", ["end"] = "↘", pageup = "⇞", pagedown = "⇟",
 }
 local function windowFrame()
+    if M.config.target == "mouseScreen" then
+        local screen = hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
+        return screen:frame(), screen
+    end
     local win
     if M.config.target == "mouse" then
         local p = hs.mouse.absolutePosition()
@@ -48,7 +54,29 @@ end
 local function clearRows()
     if animationTimer then animationTimer:stop(); animationTimer = nil end
     for _, row in ipairs(rows) do row.canvas:delete() end
-    rows, currentTextRow = {}, nil
+    rows, currentTextRow, lastRepeatRow = {}, nil, nil
+end
+
+local superscriptDigits = { ["0"] = "⁰", ["1"] = "¹", ["2"] = "²", ["3"] = "³", ["4"] = "⁴", ["5"] = "⁵", ["6"] = "⁶", ["7"] = "⁷", ["8"] = "⁸", ["9"] = "⁹" }
+local function countBadge(count)
+    return (tostring(count):gsub("%d", superscriptDigits))
+end
+local function compactText(text)
+    local parts, previous, count = {}, nil, 0
+    local function flush()
+        if previous then parts[#parts + 1] = previous .. (count > 1 and countBadge(count) or "") end
+    end
+    for _, code in utf8.codes(text) do
+        local char = utf8.char(code)
+        if char == previous then count = count + 1 else flush(); previous, count = char, 1 end
+    end
+    flush()
+    return table.concat(parts)
+end
+local function displayText(row, text)
+    if M.config.repeatMode ~= "badge" then return text end
+    if row.kind == "text" then return compactText(text) end
+    return text .. ((row.repeatCount or 1) > 1 and countBadge(row.repeatCount) or "")
 end
 
 local function layoutRows()
@@ -62,11 +90,13 @@ local function layoutRows()
     local h = math.min(cfg.fontSize * 1.8, bottom - top)
     local stride, margin = h + 6, math.max(0, cfg.margin)
     for i, row in ipairs(rows) do
-        local text = row.text
+        local rawText = row.text
+        local text = rawText and displayText(row, rawText)
         local size = not row.mouseButton and hs.drawing.getTextDrawingSize(text, { size = cfg.fontSize })
         local maxWidth = math.max(1, right - left - 24)
-        while size and size.w > maxWidth and utf8.len(text) and utf8.len(text) > 1 do
-            text = text:sub(utf8.offset(text, 2))
+        while size and size.w > maxWidth and utf8.len(rawText) and utf8.len(rawText) > 1 do
+            rawText = rawText:sub(utf8.offset(rawText, 2))
+            text = displayText(row, rawText)
             size = hs.drawing.getTextDrawingSize(text, { size = cfg.fontSize })
         end
         local w = math.min(math.max((size and size.w or cfg.fontSize) + 24, 42), right - left)
@@ -107,6 +137,7 @@ local function animateRows()
         local fade = math.max(0, cfg.fadeDuration)
         if elapsed >= cfg.linger + fade then
             if currentTextRow == row then currentTextRow = nil end
+            if lastRepeatRow == row then lastRepeatRow = nil end
             row.canvas:delete(); table.remove(rows, i)
         else
             local opacity = elapsed <= cfg.linger and 1 or 1 - (elapsed - cfg.linger) / math.max(fade, 0.001)
@@ -120,7 +151,7 @@ local function animateRows()
     if #rows == 0 and animationTimer then animationTimer:stop(); animationTimer = nil end
 end
 
-local function show(text, mouseButton, row)
+local function show(text, mouseButton, row, kind, repeatCount)
     if not active then return end
     if not row then
         local c = hs.canvas.new({ x = 0, y = 0, w = 1, h = 1 })
@@ -132,15 +163,37 @@ local function show(text, mouseButton, row)
         while #rows > math.max(1, M.config.maxRows) do
             local old = table.remove(rows, 1)
             if currentTextRow == old then currentTextRow = nil end
+            if lastRepeatRow == old then lastRepeatRow = nil end
             old.canvas:delete()
         end
     end
-    row.text, row.mouseButton, row.updatedAt = text, mouseButton, hs.timer.secondsSinceEpoch()
+    row.text, row.mouseButton, row.kind, row.repeatCount, row.updatedAt = text, mouseButton, kind, repeatCount, hs.timer.secondsSinceEpoch()
     row.canvas:alpha(1)
     layoutRows()
     if not animationTimer then animationTimer = hs.timer.doEvery(1 / 30, animateRows) end
     return row
 end
+
+-- macOS virtual key codes identify physical key positions. These labels follow
+-- a US ANSI keyboard, independently of the current input method or layout.
+local physicalKeys = {
+    [0] = {"a", "A"}, [1] = {"s", "S"}, [2] = {"d", "D"}, [3] = {"f", "F"},
+    [4] = {"h", "H"}, [5] = {"g", "G"}, [6] = {"z", "Z"}, [7] = {"x", "X"},
+    [8] = {"c", "C"}, [9] = {"v", "V"}, [11] = {"b", "B"}, [12] = {"q", "Q"},
+    [13] = {"w", "W"}, [14] = {"e", "E"}, [15] = {"r", "R"}, [16] = {"y", "Y"},
+    [17] = {"t", "T"}, [18] = {"1", "!"}, [19] = {"2", "@"}, [20] = {"3", "#"},
+    [21] = {"4", "$"}, [22] = {"6", "^"}, [23] = {"5", "%"}, [24] = {"=", "+"},
+    [25] = {"9", "("}, [26] = {"7", "&"}, [27] = {"-", "_"}, [28] = {"8", "*"},
+    [29] = {"0", ")"}, [30] = {"]", "}"}, [31] = {"o", "O"}, [32] = {"u", "U"},
+    [33] = {"[", "{"}, [34] = {"i", "I"}, [35] = {"p", "P"}, [37] = {"l", "L"},
+    [38] = {"j", "J"}, [39] = {"'", "\""}, [40] = {"k", "K"}, [41] = {";", ":"},
+    [42] = {"\\", "|"}, [43] = {",", "<"}, [44] = {"/", "?"}, [45] = {"n", "N"},
+    [46] = {"m", "M"}, [47] = {".", ">"}, [50] = {"`", "~"},
+    [65] = {".", "."}, [67] = {"*", "*"}, [69] = {"+", "+"}, [75] = {"/", "/"},
+    [78] = {"-", "-"}, [81] = {"=", "="}, [82] = {"0", "0"}, [83] = {"1", "1"},
+    [84] = {"2", "2"}, [85] = {"3", "3"}, [86] = {"4", "4"}, [87] = {"5", "5"},
+    [88] = {"6", "6"}, [89] = {"7", "7"}, [91] = {"8", "8"}, [92] = {"9", "9"},
+}
 
 local function keyText(event)
     local flags, code = event:getFlags(), event:getKeyCode()
@@ -156,6 +209,9 @@ local function keyText(event)
     if not key then
         if isSpecial then key = name:upper()
         elseif isShortcut then key = (event:getCharacters(true) or ""):upper()
+        elseif M.config.textKeyMode == "physical" then
+            local labels = physicalKeys[code]
+            key = labels and labels[flags.shift and 2 or 1] or ""
         else key = event:getCharacters() or "" end
     end
     if key == "" or key:match("^%c") then
@@ -186,22 +242,31 @@ end
 local function handleKey(event)
     local label, kind = keyText(event)
     if not label then
+        lastRepeatRow = nil
         local flags = event:getFlags()
         if flags.cmd or flags.alt or flags.ctrl then currentTextRow = nil end
         return
     end
+    local now = hs.timer.secondsSinceEpoch()
+    local repeating = M.config.repeatMode == "badge" and lastRepeatRow and lastRepeatRow.repeatLabel == label
+        and lastRepeatRow.kind == kind and now - lastRepeatRow.updatedAt <= M.config.sequenceDelay
     if kind == "text" then
-        local now = hs.timer.secondsSinceEpoch()
         if currentTextRow and now - currentTextRow.updatedAt > M.config.sequenceDelay then currentTextRow = nil end
-        local text = (currentTextRow and currentTextRow.text or "") .. label
+        local row = currentTextRow or (repeating and lastRepeatRow or nil)
+        local text = (row and row.text or "") .. label
         local length = utf8.len(text)
         local limit = math.max(1, math.floor(M.config.maxTextLength))
         if length and length > limit then text = text:sub(utf8.offset(text, length - limit + 1)) end
-        currentTextRow = show(text, nil, currentTextRow)
+        currentTextRow = show(text, nil, row, kind)
+        currentTextRow.repeatLabel = label
+        lastRepeatRow = currentTextRow
         if endsTextRun(label) then currentTextRow = nil end
     else
         currentTextRow = nil
-        show(label)
+        local row = repeating and lastRepeatRow or nil
+        local count = row and (row.repeatCount or 1) + 1 or 1
+        lastRepeatRow = show(label, nil, row, kind, count)
+        lastRepeatRow.repeatLabel = label
     end
 end
 
@@ -238,7 +303,7 @@ function M.start()
             end
         end
         if mouseButton then hs.timer.doAfter(0, function()
-            if active then currentTextRow = nil; show(nil, mouseButton) end
+            if active then currentTextRow = nil; lastRepeatRow = nil; show(nil, mouseButton) end
         end) end
         return false
     end)
