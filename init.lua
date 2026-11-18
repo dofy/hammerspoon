@@ -17,6 +17,7 @@ local keystats = require("keystats")
 -- 挂哪些 widget、各自参数都是每台机器自己的事，写在 init.local.lua 里；这里不挂任何 widget。
 local statusbar = require("statusbar")
 local displayBrightness = require("display-brightness")
+local keycast = require("keycast")
 
 -- 按顺序启动的模块。init.local.lua 可以改它们的 config，或把某项设为 nil 不启动。
 local modules = {
@@ -24,8 +25,9 @@ local modules = {
     keystats = keystats,
     statusbar = statusbar,
     displayBrightness = displayBrightness,
+    keycast = keycast,
 }
-local startOrder = { "mouseFollow", "keystats", "statusbar", "displayBrightness" }
+local startOrder = { "mouseFollow", "keystats", "statusbar", "displayBrightness", "keycast" }
 
 -- Per-machine overrides: init.local.lua 被 git 忽略，不存在时从 init.local.example.lua 复制。
 local configDir = hs.configdir .. "/"

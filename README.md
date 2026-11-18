@@ -311,3 +311,15 @@ Two rules matter:
 
 Every call into widget code is wrapped in `pcall`. A widget that throws shows `⚠` with the error
 as its tooltip, and the other widgets keep running.
+
+## Keycast
+
+`keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press **⌃⌥⌘K** to toggle it. It does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
+
+- `target`: `focused` anchors to the focused window, `mouse` to the frontmost standard window under the pointer. If no window is found, the pointer's screen is used.
+- `position`: `bottomLeft`, `bottomRight`, `topLeft`, `topRight`, or `center`; `margin` controls the inset in points. The overlay is clamped to the visible screen.
+- `types`: independently enable `shortcuts` (⌘/⌥/⌃ combinations), `text`, `special` (navigation, function keys, space, etc.), and `mouse`. Shift-only characters count as text.
+- When `text` is enabled, printable keys accumulate until `sequenceDelay` seconds of inactivity or another displayed action; a shortcut also clears the sequence when shortcuts are filtered out. A space or punctuation ends the line after being appended; older lines move up and fade after `linger`. Space appears as ␣. Long sequences keep their most recent characters visible and retain at most `maxTextLength` Unicode code points.
+- `hotkey`, `colors`, `fontSize`, `sequenceDelay`, `linger`, `fadeDuration`, `moveDuration`, `maxRows`, `maxTextLength`, and startup `enabled` are configurable. Set `hotkey = nil` to omit the binding.
+
+The overlay joins Spaces and supports full-screen windows. macOS Secure Input prevents keyboard events from reaching Hammerspoon. Text shows key events, not necessarily the final text committed by an input method; enabling text can expose sensitive input during screen sharing.

@@ -3,7 +3,7 @@
 -- 它在 init.lua 设完默认值之后、模块 start() 之前执行，所以这里的赋值会覆盖默认值。
 -- 保存后照样自动 reload。
 --
--- 参数 modules: { mouseFollow = ..., keystats = ..., statusbar = ..., displayBrightness = ... }
+-- 参数 modules: { mouseFollow = ..., keystats = ..., statusbar = ..., displayBrightness = ..., keycast = ... }
 --   改 config：modules.<name>.config.<key> = value
 --   不启动某模块：modules.<name> = nil
 local modules = ...
@@ -26,3 +26,19 @@ local modules = ...
 -- }
 -- 示例：覆盖单个 widget 的参数
 -- modules.statusbar.config.widgetConfig.kaon = { font = { name = "Menlo", size = 13 }, decimals = 1 }
+
+-- 按键提示：默认关闭，用 ⌃⌥⌘K 开关。取消注释并按需修改。
+-- modules.keycast.config.hotkey = { mods = { "ctrl", "alt", "cmd" }, key = "k" }
+-- modules.keycast.config.target = "focused" -- focused：活动窗口；mouse：鼠标下的窗口
+-- modules.keycast.config.position = "bottomLeft" -- topLeft / topRight / bottomLeft / bottomRight / center
+-- modules.keycast.config.margin = 24
+-- modules.keycast.config.types = { shortcuts = true, text = false, special = true, mouse = false }
+-- modules.keycast.config.colors = { background = { white = 0.12, alpha = 0.9 }, text = { white = 1, alpha = 1 } }
+-- modules.keycast.config.fontSize = 42
+-- modules.keycast.config.sequenceDelay = 0.5 -- 连续文字分段间隔
+-- modules.keycast.config.linger = 2.0 -- 每条提示停留时间
+-- modules.keycast.config.fadeDuration = 0.2
+-- modules.keycast.config.moveDuration = 0.15
+-- modules.keycast.config.maxRows = 6
+-- modules.keycast.config.maxTextLength = 200
+-- modules.keycast.config.enabled = true -- 重载后自动开启；会展示允许的输入
