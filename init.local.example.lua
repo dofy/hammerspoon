@@ -33,6 +33,7 @@ local modules = ...
 -- modules.keycast.config.position = "bottomLeft" -- topLeft / topRight / bottomLeft / bottomRight / center
 -- modules.keycast.config.margin = 24
 -- modules.keycast.config.types = { shortcuts = true, text = false, special = true, mouse = false }
+-- modules.keycast.config.showModifiers = true -- show held modifier keys
 -- modules.keycast.config.colors = { background = { white = 0.12, alpha = 0.9 }, text = { white = 1, alpha = 1 } }
 -- modules.keycast.config.fontSize = 42
 -- modules.keycast.config.sequenceDelay = 0.5 -- text sequence gap in seconds
@@ -40,7 +41,6 @@ local modules = ...
 -- modules.keycast.config.fadeDuration = 0.2
 -- modules.keycast.config.moveDuration = 0.15
 -- modules.keycast.config.maxRows = 6
--- modules.keycast.config.textKeyMode = "physical" -- input: input-method characters; physical: US keyboard positions
 -- modules.keycast.config.repeatMode = "badge" -- normal: every press; badge: superscript repeat count
 -- modules.keycast.config.maxTextLength = 200
 -- modules.keycast.config.enabled = true -- enable on reload; allowed input will be visible

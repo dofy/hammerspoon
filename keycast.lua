@@ -7,13 +7,13 @@ M.config = {
     position = "bottomLeft", -- topLeft | topRight | bottomLeft | bottomRight | center
     margin = 24,
     types = { shortcuts = true, text = false, special = true, mouse = false },
+    showModifiers = false, -- show held modifiers until released
     sequenceDelay = 0.5, -- inactivity before starting a new text line
     linger = 2.0, -- seconds before fading
     fadeDuration = 0.2,
     moveDuration = 0.15,
     maxRows = 6,
     repeatMode = "normal", -- normal | badge
-    textKeyMode = "input", -- input | physical (US ANSI positions)
     maxTextLength = 200, -- maximum Unicode code points kept in memory
     fontSize = 42,
     colors = { background = { white = 0, alpha = 0.8 }, text = { white = 1, alpha = 1 } },
@@ -22,7 +22,8 @@ M.config = {
 local tap, binding, watchdog, animationTimer
 local statusCanvas, statusTimer, statusFadeTimer
 local active = false
-local rows, currentTextRow, lastRepeatRow = {}, nil, nil
+local modifiersSuppressed = false
+local rows, currentTextRow, lastRepeatRow, modifierRow = {}, nil, nil, nil
 local special = {
     return_ = "↩", ["return"] = "↩", tab = "⇥", space = "␣", delete = "⌫",
     forwarddelete = "⌦", padenter = "↩", padclear = "⌧", help = "?⃝", escape = "⎋", left = "←", right = "→", up = "↑", down = "↓",
@@ -55,7 +56,8 @@ end
 local function clearRows()
     if animationTimer then animationTimer:stop(); animationTimer = nil end
     for _, row in ipairs(rows) do row.canvas:delete() end
-    rows, currentTextRow, lastRepeatRow = {}, nil, nil
+    rows, currentTextRow, lastRepeatRow, modifierRow = {}, nil, nil, nil
+    modifiersSuppressed = false
 end
 
 local superscriptDigits = { ["0"] = "⁰", ["1"] = "¹", ["2"] = "²", ["3"] = "³", ["4"] = "⁴", ["5"] = "⁵", ["6"] = "⁶", ["7"] = "⁷", ["8"] = "⁸", ["9"] = "⁹" }
@@ -136,12 +138,12 @@ local function animateRows()
         local row = rows[i]
         local elapsed = now - row.updatedAt
         local fade = math.max(0, cfg.fadeDuration)
-        if elapsed >= cfg.linger + fade then
+        if row ~= modifierRow and elapsed >= cfg.linger + fade then
             if currentTextRow == row then currentTextRow = nil end
             if lastRepeatRow == row then lastRepeatRow = nil end
             row.canvas:delete(); table.remove(rows, i)
         else
-            local opacity = elapsed <= cfg.linger and 1 or 1 - (elapsed - cfg.linger) / math.max(fade, 0.001)
+            local opacity = (row == modifierRow or elapsed <= cfg.linger) and 1 or 1 - (elapsed - cfg.linger) / math.max(fade, 0.001)
             row.canvas:alpha(math.max(0, math.min(1, opacity)))
             local t = math.min(1, (now - row.moveStarted) / math.max(cfg.moveDuration, 0.001))
             local f = row.canvas:frame()
@@ -161,8 +163,11 @@ local function show(text, mouseButton, row, kind, repeatCount)
         c:clickActivating(false)
         row = { canvas = c }
         rows[#rows + 1] = row
-        while #rows > math.max(1, M.config.maxRows) do
-            local old = table.remove(rows, 1)
+        -- The held-modifier indicator gets a separate slot from the history.
+        local limit = math.max(1, M.config.maxRows) + ((modifierRow or kind == "modifiers") and 1 or 0)
+        while #rows > limit do
+            local index = rows[1] == modifierRow and 2 or 1
+            local old = table.remove(rows, index)
             if currentTextRow == old then currentTextRow = nil end
             if lastRepeatRow == old then lastRepeatRow = nil end
             old.canvas:delete()
@@ -209,11 +214,12 @@ local function keyText(event)
     local key = special[name]
     if not key then
         if isSpecial then key = name:upper()
-        elseif isShortcut then key = (event:getCharacters(true) or ""):upper()
-        elseif M.config.textKeyMode == "physical" then
+        else
             local labels = physicalKeys[code]
-            key = labels and labels[flags.shift and 2 or 1] or ""
-        else key = event:getCharacters() or "" end
+            if not labels then return end
+            -- A shortcut shows the key's base symbol; Shift is shown separately.
+            key = isShortcut and labels[1]:upper() or labels[flags.shift and 2 or 1]
+        end
     end
     if key == "" or key:match("^%c") then
         if isText then return end
@@ -269,6 +275,43 @@ local function handleKey(event)
         lastRepeatRow = show(label, nil, row, kind, count)
         lastRepeatRow.repeatLabel = label
     end
+end
+
+local function removeModifierRow()
+    if not modifierRow then return end
+    for i, row in ipairs(rows) do
+        if row == modifierRow then
+            row.canvas:delete()
+            table.remove(rows, i)
+            break
+        end
+    end
+    modifierRow = nil
+    if #rows > 0 then layoutRows()
+    elseif animationTimer then animationTimer:stop(); animationTimer = nil end
+end
+
+local function handleModifiers(flags)
+    local label = ""
+    if flags.ctrl then label = label .. "⌃" end
+    if flags.alt then label = label .. "⌥" end
+    if flags.shift then label = label .. "⇧" end
+    if flags.cmd then label = label .. "⌘" end
+    if flags.fn then label = label .. "fn" end
+    if label == "" then
+        modifiersSuppressed = false
+        removeModifierRow()
+    elseif not modifiersSuppressed then
+        modifierRow = show(label, nil, modifierRow, "modifiers")
+    end
+end
+
+local function processKey(event)
+    if modifierRow then
+        modifiersSuppressed = true
+        removeModifierRow()
+    end
+    handleKey(event)
 end
 
 function M.setEnabled(enabled)
@@ -329,9 +372,16 @@ end
 function M.start()
     M.stop()
     local types = hs.eventtap.event.types
-    tap = hs.eventtap.new({ types.keyDown, types.leftMouseDown, types.rightMouseDown, types.otherMouseDown }, function(event)
+    tap = hs.eventtap.new({ types.keyDown, types.flagsChanged, types.leftMouseDown, types.rightMouseDown, types.otherMouseDown }, function(event)
+        if event:getType() == types.flagsChanged then
+            if M.config.showModifiers then
+                local flags = event:getFlags()
+                hs.timer.doAfter(0, function() if active then handleModifiers(flags) end end)
+            end
+            return false
+        end
         if event:getType() == types.keyDown then
-            hs.timer.doAfter(0, function() if active then handleKey(event) end end)
+            hs.timer.doAfter(0, function() if active then processKey(event) end end)
             return false
         end
         local mouseButton
