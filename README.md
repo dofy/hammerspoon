@@ -1,343 +1,100 @@
-# .hammerspoon
+# Hammerspoon
 
-My personal [Hammerspoon](https://www.hammerspoon.org/) configuration for automating macOS.
+A personal macOS toolkit for navigating displays, showing keystrokes, and keeping useful numbers in the menu bar.
 
-## Features
+> **Built for multiple displays.** Brightness follows the pointer. Windows can bring the pointer along. Keystrokes and shortcuts stay visible when you need them.
 
-- **Display brightness** (`display-brightness.lua`) — brightness keys, F1/F2, Scroll Lock/Pause (F14/F15), and ⌃⌥⌘[ / ] change the hardware brightness of the display under the mouse by 5. Native display brightness uses macOS APIs; external DDC displays use `m1ddc` by UUID. Commands are serialized and the display is chosen when the key is pressed. A single brightness panel follows the adjusted display and updates with each change. Other modified keys retain their normal behavior.
+## The toolkit
 
-  The module checks `/opt/homebrew/bin/m1ddc` and `/usr/local/bin/m1ddc` and warns if neither exists; it never installs dependencies. Set `modules.displayBrightness.config.cli` to an absolute path in `init.local.lua` for a different install. Each machine stores its own successfully verified brightness values in Hammerspoon settings by display UUID. A reconnected display is restored after a three-second settling delay; a manual adjustment during the delay takes priority. Existing displays are not changed on Hammerspoon reload. Restoration requires the same UUID and working native or DDC read/write support.
+| Module | What it does | Guide |
+| :--- | :--- | :--- |
+| **Brightness** | Adjust the display under the pointer, including external DDC displays. | [Display controls](#display-controls) |
+| **Keycast** | Show keystrokes, shortcuts and held modifiers in a temporary overlay. | [Keycast →](docs/keycast.md) |
+| **Mouse Follow** | Move the pointer to a window’s display when focus changes. | [Configuration](#make-it-yours) |
+| **Keystats** | Record shortcut usage and explore it in a local dashboard or CLI. | [Keystats →](docs/keystats.md) |
+| **Statusbar** | Mount small menu-bar widgets for Kaon Router, network speed and battery. | [Statusbar →](docs/statusbar.md) |
 
-- **Keycast** (`keycast.lua`) — optionally shows recent keys and shortcuts on screen, with independent fading lines, mouse-screen positioning, and repeat-count badges. Toggle with ⌃⌥⌘K.
-- **Mouse Follow** (`mouse-follow.lua`) — automatically warps the cursor to the center of a window's screen when that window gains focus, so the pointer follows your attention across multiple displays. Clicking to focus a window is detected and suppressed, so a click never yanks the mouse away.
-- **Keystats** (`keystats.lua`) — records every keystroke that carries ⌘, ⌥ or ⌃, together with the frontmost application, so you can find out which shortcuts you actually use. Data lands in `~/.local/share/keystats/keystats.db`; query it with the `keystats` CLI, or watch it live with `keystats serve`.
-- **Statusbar** (`statusbar.lua`) — a menu-bar host: small widget files under `statusbar/` say what to show and how often, and the host creates the status item, drives the refresh and builds the dropdown. Ships with a Kaon Router spend readout and a battery readout.
-- **Battery info** (`test.lua`) — an on-demand diagnostic that prints detailed battery stats (health, cycles, capacity, voltage…) to the Hammerspoon Console. Run `require("test").test()` in the Console.
-- **Manual reload** — press `⌘ + ⌥ + ⌃ + R` to reload the config at any time.
-- **Auto reload** — saving any `.lua` file under `~/.hammerspoon/` reloads the config automatically.
+## Get started
 
-## Installation
-
-1. Install [Hammerspoon](https://www.hammerspoon.org/) (e.g. `brew install --cask hammerspoon`).
-2. Back up your existing config if you have one, then clone into place:
+1. Install [Hammerspoon](https://www.hammerspoon.org/) (`brew install --cask hammerspoon`).
+2. Back up any existing `~/.hammerspoon` configuration, then clone this repository:
 
    ```sh
    git clone https://github.com/dofy/hammerspoon.git ~/.hammerspoon
    ```
 
-3. Launch Hammerspoon and grant Accessibility permissions when prompted.
-4. Reload the config (menu-bar icon → _Reload Config_, or `⌘ + ⌥ + ⌃ + R`).
+3. Launch Hammerspoon and grant Accessibility permission when prompted.
+4. Reload with **⌃⌥⌘R**, or choose **Reload Config** from the menu bar.
 
-## Layout
+Saving a Lua file in the configuration directory also reloads it automatically. On first launch, `init.local.lua` is created from [`init.local.example.lua`](init.local.example.lua); it is ignored by Git and holds machine-specific settings.
 
-```
-init.lua          # entry point: loads modules, binds reload hotkey, starts the path watcher
-init.local.example.lua # template for init.local.lua (git-ignored per-machine overrides, auto-created)
-mouse-follow.lua  # mouse-follow module (config + start/stop/toggle)
-keycast.lua       # optional on-screen keystroke visualizer
-keystats.lua      # shortcut-usage collector (writes ~/.local/share/keystats/keystats.db)
-keystats/keystats # CLI over that database
-keystats/server.py# live dashboard server (`keystats serve`)
-keystats/report.html # dashboard page, used by both the live server and static reports
-statusbar.lua     # menu-bar host (owns every hs.menubar item)
-statusbar/        # widget files, one status item each
-test.lua          # battery-info diagnostic (loaded on demand)
-Spoons/           # bundled Spoons
-```
+## At a glance
 
-## Keystats
+| Control | Action |
+| :--- | :--- |
+| **⌃⌥⌘R** | Reload the configuration |
+| **⌃⌥⌘K** | Toggle Keycast; a brief status panel appears in the center of the pointer’s screen |
+| **Brightness keys / F1–F2 / F14–F15** | Adjust the display under the pointer |
+| **⌃⌥⌘[ / ]** | Adjust the display under the pointer |
 
-Link the CLI onto your `PATH` once:
+Keycast starts off by default. Keystats starts with Hammerspoon and serves a local dashboard; its database is stored outside this repository. Status-bar widgets are selected per machine and none are mounted by default.
 
-```sh
-ln -s ~/.hammerspoon/keystats/keystats ~/.local/bin/keystats
-```
+## Make it yours
 
-```sh
-keystats serve --open                              # live dashboard, polls every 5s
-keystats status                                    # rows, date range, db size
-keystats top --since 7d --app Cursor                # most used shortcuts in one app
-keystats pivot --rows app --cols mods --since 30d   # any two dimensions crossed
-keystats time --bucket hourofday                    # when during the day you press them
-keystats unused --from combos.txt --since 30d       # bindings you configured but never pressed
-keystats global --since 30d                         # global hotkey vs in-app shortcut
-keystats report --since 30d --open                  # static snapshot of the dashboard
-keystats sql "SELECT ..."                           # escape hatch
-keystats prune --older-than 90d                     # roll old events up to the hour
-```
-
-Every query command accepts `--since` / `--until` / `--app` / `--mods` / `--key`.
-Time values are `all`, `today`, `yesterday`, `7d`, `24h`, `90m`, `4w`, `3mo` or `YYYY-MM-DD`;
-dimensions are `combo`, `key`, `mods`, `app`, `bundle`, `hour`, `day`, `week`, `month`, `dow`
-and `hourofday`.
-
-### The dashboard
-
-`init.lua` already starts that dashboard: the collector supervises `keystats/server.py` as a
-child task, so it is up whenever Hammerspoon is (`config.server` holds `enabled`, `host`, `port`
-and the restart policy). A heavy query therefore runs in another process and can never stall the
-event tap, which an in-process server would. The child watches `getppid()` and exits on its own
-when Hammerspoon goes away, because a `SIGTERM` or `SIGKILL` to the parent never reaches
-`hs.shutdownCallback` and the port would otherwise stay held. Reloading the config replaces the
-server; if the port is already taken the collector logs it once and leaves the running server
-alone rather than retrying.
-
-`keystats serve` starts the same thing by hand on `127.0.0.1:8787` (`--port`, `--host`), for a
-second instance or a different database. It polls the database every five seconds, so the
-numbers move while you work; the footer carries the refresh clock and a pause button. The server
-binds to loopback on purpose — this database is a record of every shortcut you press.
-
-`keystats report` writes a self-contained snapshot of that page instead, for archiving or
-sharing. Both carry a keyboard heatmap; one shortcut table combining the ranking with the
-global-vs-in-app verdict (they were two views of the same per-combination aggregate); the
-per-app and per-modifier split, each switchable between bars and a donut; a time-of-day
-histogram and a trend chart, each switchable between bars and a line and each carrying a
-labelled scale, because a chart read only through its tooltip says nothing once it becomes an
-image; and a combination × app detail table. Everything re-pivots client-side from the app and modifier
-selectors.
-
-**Share image** rasterises the page itself into a PNG — preview, download, or copy to the
-clipboard. It needs no library and works from `file://`: the page is cloned into an
-`<svg><foreignObject>` together with its own stylesheet and drawn onto a canvas at 2×, which
-stays untainted only because the page loads no external image or font. Inside that SVG the clone
-is not `:root`, so neither the dark media query nor `:root[data-theme]` matches it and
-`body { color }` never applies either; the resolved custom properties and text colour are copied
-onto the clone instead of relying on a selector.
-Interactive chrome carrying `data-noexport` — the share button, the pause button, the tooltip —
-is stripped first, and the detail table is captured in whatever state it is on screen.
-
-Marks carry their readout in `data-tip` rather than a `title`, because the native tooltip waits
-out the OS delay before appearing and that is useless while sweeping a cursor across a chart.
-One delegated `pointermove` listener positions a single bubble, clamped to the viewport, and
-clears it whenever the page re-renders underneath it.
-
-Window titles were collected until 2026-10-22 and then dropped: in the apps that carry the most
-shortcuts the title was a constant (`WeChat`, `Feishu`) and added nothing to the app name, while the
-apps with many titles — a browser, a chat client — contributed a fresh row per page, 45% of them
-seen exactly once. The dimension cost a filter, a panel, a detail column and an API branch, and
-it was the only thing in the database recording *what* was on screen rather than which keys were
-pressed. Per-project context, if it is ever wanted, belongs in a low-cardinality field derived at
-collection time (a repository or session name parsed out of the title), not in the raw title.
-
-### Global hotkey or in-app shortcut?
-
-An event tap sees a keystroke *before* any app or global hotkey handler consumes it, so the only
-app it can record is whoever was frontmost. A Raycast or Karabiner binding pressed while Cursor
-is in front is therefore filed under Cursor. Two signals narrow it down, and `keystats global`
-(and the dashboard's **Global vs in-app** panel) report both:
-
-- **switch hits** — when an app activation lands within `config.globalSwitchWindow` (0.6s) of a
-  keystroke, that target app is stored on the event. Only counts from three hits up: closing the
-  frontmost window brings another app forward on its own, so a single activation proves nothing.
-- **focus** — the share of those activations that went to the most common target. A launcher
-  always lands on the same app; `⌘Tab` scatters over everything, which reads as *switcher* rather
-  than a launcher for any one app.
-- **App spread** — whether the combination belongs to one application or turns up
-  everywhere. It is the Shannon entropy of its distribution over apps normalised by
-  `log2(apps in range)`, which counts the balance and not just the number of apps: 100 presses in
-  Chrome and one in Finder is two apps but still Chrome's shortcut. Four or more apps and a
-  spread of 0.6 or higher reads as *suspected global*.
-
-The dashboard shows both as a segmented meter rather than a bare `0.37`, because the level reads
-off the number of filled cells — legible in greyscale, in print and to a colour-blind viewer —
-while the figure itself, the app count and which app the switches went to sit in the tooltip.
-
-`⌘Q` used to look like a global hotkey, because quitting the frontmost app brings the next one
-forward. macOS reports the termination *after* that activation, so the quit cannot be filtered
-out up front; instead the collector takes the tag back when the app that was in front turns out
-to have quit. That only works while the press is still buffered, as does tagging itself — a
-keystroke in the last moments before a flush is missed either way. Neither signal can see a
-global binding that leaves the frontmost app alone, such as a window-management hotkey or
-Raycast's panel, which does not take activation.
-
-### What it does and does not record
-
-A keystroke is recorded only when it carries ⌘, ⌥ or ⌃. Shift alone is capitalisation, so it
-counts only as a co-modifier. Escape and the function keys are the exception that
-`config.includeBareFunctionKeys` records bare, on by default: macOS sets the `fn` flag on every
-function key and this module drops that flag, so an unmodified F5 arrives carrying nothing at all
-and would otherwise be invisible. A bare arrow key or page-up is movement rather than a shortcut
-and stays out unless `config.includeBareNavigationKeys` is set. Plain character keys are never
-recorded unless `config.includePlainKeys` is set, so the database holds no typed text and no
-window titles.
-
-Real hotkeys that live on Shift alone are named individually in `config.alwaysRecord`, which
-ships with Raycast's `shift+space`. Write the key the way this module spells it: modifiers in
-`ctrl+alt+shift+cmd` order, then the `hs.keycodes.map` name, joined with `+`. Modifier order is normalised to `ctrl+alt+shift+cmd`, and the `fn` flag is dropped,
-because macOS sets it on every arrow and function key. Keys are stored as keycodes, so switching
-input source cannot split one physical key across two rows. Key repeats from holding a key down
-are skipped by default. Nothing is recorded while macOS secure input is active (password fields,
-or a terminal with Secure Keyboard Entry enabled) — those keystrokes never reach an event tap.
-
-### Storage
-
-Events are buffered in memory and flushed in one transaction every five seconds. Roughly 5k
-events a day cost about 60 MB a year, so `keystats prune --older-than 90d` rolls older events up
-to hour granularity. The database lives outside this repository,
-under `~/.local/share/keystats/`, and is never committed.
-
-## Configuration
-
-Mouse-follow behavior is tuned in `init.lua`:
-
-```lua
-mouseFollow.config.moveDelay = 0.0          -- delay before moving the mouse (seconds)
-mouseFollow.config.clickDetectWindow = 0.3  -- window to ignore clicks that caused focus (seconds)
-```
-
-Toggle it at runtime with `mouseFollow.toggle()`.
-
-### Statusbar
-
-Widgets are a per-machine choice, set in the git-ignored `init.local.lua`; `init.lua` mounts
-none. The widget list is also the on/off switch — a name in it runs, a name commented out does
-not:
+Edit `~/.hammerspoon/init.local.lua`. The file receives a `modules` table and runs after shared defaults, before modules start:
 
 ```lua
 local modules = ...
-modules.statusbar.config.widgets = {
-    "kaon",
-    -- "battery",
-}
-modules.statusbar.config.widgetConfig.battery = {lowThreshold = 15}
+
+modules.keycast.config.target = "mouseScreen"
+modules.keycast.config.showModifiers = true
+modules.statusbar.config.widgets = { "netspeed", "battery" }
+-- modules.keystats = nil  -- disable a module on this machine
 ```
 
-Saving the file reloads Hammerspoon, so the change takes effect immediately. There is no runtime
-toggle and nothing is stored outside the file: what the list says is what is mounted. To check
-what actually came up:
+See [`init.local.example.lua`](init.local.example.lua) for more configuration examples. To enable Keycast on reload, set `modules.keycast.config.enabled = true`; its text and mouse display options remain independently configurable.
+
+### Display controls
+
+Brightness changes in 5-point steps. Native displays use macOS APIs; external displays use `m1ddc`, with commands serialized and the target selected at keypress time. The module checks the Apple Silicon and Intel Homebrew paths for `m1ddc`; override `modules.displayBrightness.config.cli` if it lives elsewhere. It never installs the tool.
+
+Successfully verified values are stored per display UUID in Hammerspoon settings. On reconnect, restoration waits three seconds and yields to a manual adjustment. Existing displays are not changed on reload; restoration requires the same UUID and working native or DDC read/write support.
+
+### Explore shortcut usage
+
+The collector starts a local dashboard by default. Open it while Hammerspoon is running:
 
 ```sh
-hs -c 'hs.inspect(require("statusbar").status())'
+open http://127.0.0.1:8787
 ```
 
-A widget that is listed but reads `false` there failed to mount; the Hammerspoon Console carries
-the reason.
+To use the CLI, link it onto your `PATH`:
 
-#### Kaon Router spend
-
-`statusbar/kaon.lua` shows today's Kaon Router spend in the menu bar, read from the
-Kaon Admin API. It needs an automation token:
-
-1. Open <https://kaon-router-admin.kaonai.com>, then **Automation Tokens** in the sidebar.
-2. Create a token with the **`usage:read`** scope. Kaon's write scopes do not imply usage access,
-   so a token without this scope gets 403 on every request, forever.
-3. Store it outside this repository, readable only by you:
-
-   ```sh
-   printf '%s' 'kaon_pat_...' > ~/.config/kaon/token
-   chmod 600 ~/.config/kaon/token
-   ```
-
-The token is read once at start and never printed; only HTTP status codes reach the tooltip.
-
-The menu-bar title is the spend alone. The daily budget, what is left of it, and the weekly and
-monthly figures live in the tooltip and the dropdown — the budget does not change from hour to
-hour, so putting it in the title would cost width for nothing. The title does turn amber at 70%
-and red at 90% of that budget.
-
-The glyph beside the amount is `statusbar/kaon.svg`, the Kaon console's own favicon with its
-violet plate removed. It is a template image, so macOS tints it to the menu-bar foreground colour
-and it follows light and dark mode without any code. Icon and amount are drawn into one image
-rather than set as an icon plus a title, because AppKit reserves about 17pt between those two and
-`hs.menubar` cannot shrink it; the item is 69pt wide against 51pt of content, and the remaining
-18pt is AppKit's own padding.
-
-Everything about the text is configurable from `init.local.lua`, under
-`modules.statusbar.config.widgetConfig.kaon`:
-
-```lua
-modules.statusbar.config.widgetConfig.kaon = {
-    font = {name = "Menlo", size = 13}, -- monospace: the width stops jumping
-    decimals = 0,                       -- 0..4 on the amount
-    showBudget = false,                 -- "$46 / $100" instead of "$46"
-    symbol = "$",                       -- marker in front of the amount
-    iconSize = 16,                      -- points; the menu bar does not grow
-    iconGap = 3                         -- points between glyph and amount
-}
+```sh
+mkdir -p ~/.local/bin
+ln -s ~/.hammerspoon/keystats/keystats ~/.local/bin/keystats
 ```
 
-`hs.styledtext.validFont` decides what `font` may name: on this machine `Menlo`, `Monaco` and
-`MesloLGS NF` pass while `SF Mono` does not, because it is not installed as a system font. A
-Nerd Font glyph works as `symbol` (`MesloLGS NF` carries real outlines for `nf-md-currency_usd`
-`\u{F01C1}` and friends), but only with `font` pointing at a patched font — macOS fallback for
-those private-use codepoints is not guaranteed to find one.
+Add `~/.local/bin` to your `PATH` if needed. See the [Keystats guide](docs/keystats.md) for queries, recording rules, retention and privacy details.
 
-Two numbers in the dropdown disagree on purpose. `Today` comes from `/users/me/budget`, the counter
-the Kaon console's own banner shows and the one that actually gates requests. `By day (Prometheus)`
-comes from `/usage/summary`, which read about 8 USD higher for the same date. Trust `Today`.
-There is no breakdown for today alone: the only range tokens are `5m | 1h | 24h | 7d | 30d`, and
-`24h` comes back as five one-minute buckets rather than a day, so the breakdown covers seven days
-and says so. It splits that range by model, by inference key and by provider. The provider rows
-show cost without a request count because the API reports 0 requests for every provider while
-still reporting its cost.
+## Inside the config
 
-A 401, 403 or 429 stops the widget instead of retrying — `automation_protocol_throttled` and
-`automation_token_suspended` are stop signals in Kaon's contract, and hammering through them
-risks the token being suspended. Clear the stopped state from the dropdown's **Retry**, or by
-toggling the widget off and on.
-
-#### Writing a widget
-
-Drop a file in `statusbar/` and add its name to `config.widgets`. A widget returns a table:
-
-```lua
-local M = {}
-
-M.label    = "Disk"   -- shown in the ⚠ tooltip when render throws
-M.interval = 60       -- refresh seconds; nil means event-driven only
-M.config   = {path = "/"}
-
-function M.render(ctx)       -- required
-  local free = hs.fs.volume.allVolumes()[ctx.config.path]
-  if not free then return nil end          -- nil hides the item
-  return {title = "💾", tooltip = ctx.config.path}
-end
-
-function M.menu(ctx) return {{title = ctx.config.path, disabled = true}} end
-function M.start(ctx) end    -- install watchers here, call ctx.update() from them
-function M.stop(ctx) end     -- tear them down here
-
-return M
+```text
+init.lua               Shared defaults, module startup and reload watcher
+init.local.example.lua Per-machine configuration template
+keycast.lua            Keystroke overlay
+keystats.lua           Shortcut collector
+keystats/              CLI, dashboard server and report
+mouse-follow.lua       Pointer follows window focus
+display-brightness.lua Native and DDC brightness controls
+statusbar.lua          Menu-bar host
+statusbar/             Kaon, network and battery widgets
+test.lua               On-demand battery diagnostic
+Spoons/                Bundled Hammerspoon extensions
 ```
 
-`render` may return a string, an `hs.styledtext` object, a table of
-`{title =, icon =, tooltip =, template =}`, or `nil` to take the item off the bar until the next
-non-nil render. `ctx` carries `ctx.name`, `ctx.config`, `ctx.bar` and `ctx.update()`.
+## Guides
 
-Two rules matter:
-
-- `render` runs on the main thread. Anything that waits on the network or a subprocess goes into
-  `hs.task` or `hs.http.asyncGet`, with `ctx.update()` called from the callback — a blocking
-  render freezes the menu bar.
-- `click` replaces the dropdown. Define one or the other, not both.
-
-Every call into widget code is wrapped in `pcall`. A widget that throws shows `⚠` with the error
-as its tooltip, and the other widgets keep running.
-
-## Keycast
-
-`keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press **⌃⌥⌘K** to toggle it. A single status panel appears at the center of the pointer’s screen, updates in place when toggled repeatedly, and fades out after one second. Keycast does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
-
-For a screen-corner overlay with physical key labels and repeat badges, add this to `init.local.lua`:
-
-```lua
-modules.keycast.config.enabled = true
-modules.keycast.config.target = "mouseScreen"
-modules.keycast.config.position = "bottomLeft"
-modules.keycast.config.types = { shortcuts = true, text = true, special = true, mouse = false }
-modules.keycast.config.showModifiers = true
-modules.keycast.config.repeatMode = "badge"
-```
-
-The watcher reloads the configuration when the file is saved. The default text sequence interval is 0.5 seconds; each line remains for 2 seconds and fades over 0.2 seconds. A new line appears below older lines, which move upward.
-
-- `target`: `focused` anchors to the focused window, `mouse` to the frontmost standard window under the pointer, and `mouseScreen` to the pointer's screen without following a window. If no window is found, the pointer's screen is used. The `mouse` window mode may miss accessory apps and nonstandard panels.
-- `position`: `bottomLeft`, `bottomRight`, `topLeft`, `topRight`, or `center`; `margin` controls the inset in points. The overlay is clamped to the visible screen.
-- `showModifiers = true` displays held ⌃, ⌥, ⇧, ⌘ and fn keys together, updating on press and release. When another key is pressed, the modifier indicator disappears and stays hidden until all modifiers are released. It has its own row and is off by default. Caps Lock is excluded because it is a toggle.
-- `types`: independently enable `shortcuts` (⌘/⌥/⌃ combinations), `text`, `special` (navigation, function keys, space, etc.), and `mouse`. Shift-only characters count as text.
-- When `text` is enabled, printable keys accumulate until `sequenceDelay` seconds of inactivity or another displayed action; a shortcut also clears the sequence when shortcuts are filtered out. A space or punctuation ends the line after being appended; older lines move up and fade after `linger`. Space appears as ␣. Long sequences keep their most recent characters visible and retain at most `maxTextLength` Unicode code points.
-- Ordinary keys use US ANSI key positions, independent of the input method. Unmapped keys are omitted; displayed symbols do not represent the final IME composition. Shortcuts use the base key symbol with their modifier symbols.
-- `repeatMode = "badge"` groups consecutive identical characters or actions within `sequenceDelay`, showing a superscript count (e.g. `a³`, `⌫³`). The default `"normal"` displays every input separately.
-- `hotkey`, `colors`, `fontSize`, `sequenceDelay`, `linger`, `fadeDuration`, `moveDuration`, `maxRows`, `repeatMode`, `maxTextLength`, and startup `enabled` are configurable. Set `hotkey = nil` to omit the binding.
-
-The overlay joins Spaces and supports full-screen windows. macOS Secure Input prevents keyboard events from reaching Hammerspoon. Text shows key events, not necessarily the final text committed by an input method; enabling text can expose sensitive input during screen sharing.
+- [Keycast](docs/keycast.md) — display modes, placement and timing.
+- [Keystats](docs/keystats.md) — CLI, dashboard, collection and storage.
+- [Statusbar](docs/statusbar.md) — widget configuration, Kaon setup and widget authoring.
