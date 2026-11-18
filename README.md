@@ -2,17 +2,17 @@
 
 A personal macOS toolkit for navigating displays, showing keystrokes, and keeping useful numbers in the menu bar.
 
-> **Built for multiple displays.** Brightness follows the pointer. Windows can bring the pointer along. Keystrokes and shortcuts stay visible when you need them.
+> 🖥️ **Built for multiple displays.** Brightness follows the pointer. Windows can bring the pointer along. Keystrokes and shortcuts stay visible when you need them.
 
 ## The toolkit
 
 | Module | What it does | Guide |
 | :--- | :--- | :--- |
-| **Brightness** | Adjust the display under the pointer, including external DDC displays. | [Display controls](#display-controls) |
-| **Keycast** | Show keystrokes, shortcuts and held modifiers in a temporary overlay. | [Keycast →](docs/keycast.md) |
-| **Mouse Follow** | Move the pointer to a window’s display when focus changes. | [Configuration](#make-it-yours) |
-| **Keystats** | Record shortcut usage and explore it in a local dashboard or CLI. | [Keystats →](docs/keystats.md) |
-| **Statusbar** | Mount small menu-bar widgets for Kaon Router, network speed and battery. | [Statusbar →](docs/statusbar.md) |
+| ☀️ **Brightness** | Adjust the display under the pointer, including external DDC displays. | [Display controls](#display-controls) |
+| ⌨️ **Keycast** | Show keystrokes, shortcuts and held modifiers in a temporary overlay. | [Keycast →](docs/keycast.md) |
+| 🖱️ **Mouse Follow** | Move the pointer to a window’s display when focus changes. | [Configuration](#make-it-yours) |
+| 📊 **Keystats** | Record shortcut usage and explore it in a local dashboard or CLI. | [Keystats →](docs/keystats.md) |
+| 📍 **Statusbar** | Mount small menu-bar widgets for Kaon Router, network speed and battery. | [Statusbar →](docs/statusbar.md) |
 
 ## Get started
 
@@ -24,7 +24,7 @@ A personal macOS toolkit for navigating displays, showing keystrokes, and keepin
    ```
 
 3. Launch Hammerspoon and grant Accessibility permission when prompted.
-4. Reload with **⌃⌥⌘R**, or choose **Reload Config** from the menu bar.
+4. Reload with `Control + Option + Command + R`, or choose **Reload Config** from the menu bar.
 
 Saving a Lua file in the configuration directory also reloads it automatically. On first launch, `init.local.lua` is created from [`init.local.example.lua`](init.local.example.lua); it is ignored by Git and holds machine-specific settings.
 
@@ -32,10 +32,12 @@ Saving a Lua file in the configuration directory also reloads it automatically. 
 
 | Control | Action |
 | :--- | :--- |
-| **⌃⌥⌘R** | Reload the configuration |
-| **⌃⌥⌘K** | Toggle Keycast; a brief status panel appears in the center of the pointer’s screen |
-| **Brightness keys / F1–F2 / F14–F15** | Adjust the display under the pointer |
-| **⌃⌥⌘[ / ]** | Adjust the display under the pointer |
+| `Control + Option + Command + R` | Reload the configuration |
+| `Control + Option + Command + K` | Toggle Keycast; show its status in the center of the pointer’s screen |
+| `Brightness Down` / `F1` / `F14` | Dim the display under the pointer |
+| `Brightness Up` / `F2` / `F15` | Brighten the display under the pointer |
+| `Control + Option + Command + [` | Dim the display under the pointer |
+| `Control + Option + Command + ]` | Brighten the display under the pointer |
 
 Keycast starts off by default. Keystats starts with Hammerspoon and serves a local dashboard; its database is stored outside this repository. Status-bar widgets are selected per machine and none are mounted by default.
 
@@ -46,6 +48,7 @@ Edit `~/.hammerspoon/init.local.lua`. The file receives a `modules` table and ru
 ```lua
 local modules = ...
 
+modules.keycast.config.enabled = true
 modules.keycast.config.target = "mouseScreen"
 modules.keycast.config.showModifiers = true
 modules.statusbar.config.widgets = { "netspeed", "battery" }
@@ -95,6 +98,6 @@ Spoons/                Bundled Hammerspoon extensions
 
 ## Guides
 
-- [Keycast](docs/keycast.md) — display modes, placement and timing.
-- [Keystats](docs/keystats.md) — CLI, dashboard, collection and storage.
-- [Statusbar](docs/statusbar.md) — widget configuration, Kaon setup and widget authoring.
+- ⌨️ [Keycast](docs/keycast.md) — display modes, placement and timing.
+- 📊 [Keystats](docs/keystats.md) — CLI, dashboard, collection and storage.
+- 📍 [Statusbar](docs/statusbar.md) — widget configuration, Kaon setup and widget authoring.

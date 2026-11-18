@@ -2,7 +2,7 @@
 
 [← Overview](../README.md)
 
-`keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press **⌃⌥⌘K** to toggle it. A single status panel appears at the center of the pointer’s screen, updates in place when toggled repeatedly, and fades out after one second. Keycast does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
+`keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press `Control + Option + Command + K` to toggle it. A single status panel appears at the center of the pointer’s screen, updates in place when toggled repeatedly, and fades out after one second. Keycast does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
 
 For a screen-corner overlay with physical key labels and repeat badges, add this to `init.local.lua`:
 
