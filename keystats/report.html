@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -238,61 +238,61 @@ footer code { color: var(--muted); }
       <h1>Keystats</h1>
       <div class="sub" id="sub"></div>
     </div>
-    <button id="share" data-noexport>生成分享图</button>
+    <button id="share" data-noexport>Share image</button>
   </header>
 
   <div class="panel controls">
-    <div class="ctrl" id="rangeCtrl" hidden><span class="ctrl-k">时间范围</span>
+    <div class="ctrl" id="rangeCtrl" hidden><span class="ctrl-k">Time range</span>
       <span class="sel"><select id="fSince"></select></span></div>
     <div class="ctrl"><span class="ctrl-k">App</span><span class="sel"><select id="fApp"></select></span></div>
-    <div class="ctrl"><span class="ctrl-k">修饰键</span><span class="sel"><select id="fMods"></select></span></div>
-    <div class="ctrl" data-noexport><span class="ctrl-k" aria-hidden="true">&nbsp;</span><button id="reset">重置</button></div>
+    <div class="ctrl"><span class="ctrl-k">Modifiers</span><span class="sel"><select id="fMods"></select></span></div>
+    <div class="ctrl" data-noexport><span class="ctrl-k" aria-hidden="true">&nbsp;</span><button id="reset">Reset</button></div>
   </div>
 
   <div class="kpis" id="kpis"></div>
 
   <div class="panel">
-    <h2>键盘热力图 <span class="scope" id="kbScope"></span></h2>
+    <h2>Keyboard heatmap <span class="scope" id="kbScope"></span></h2>
     <div class="kb" id="kb"></div>
   </div>
 
   <!-- The ranking and the global/in-app verdict were two views of the same
        per-combination aggregate, so they are one table. -->
   <div class="panel">
-    <h2>快捷键 <span class="scope" id="comboNote"></span></h2>
+    <h2>Shortcuts <span class="scope" id="comboNote"></span></h2>
     <div class="tablewrap"><table id="comboTable">
-      <thead><tr><th>组合键</th><th class="n">按键</th><th class="barcol"></th>
-        <th class="n">占比</th><th class="n">App 数</th><th>跨 app</th>
-        <th>证据</th><th>判定</th></tr></thead>
+      <thead><tr><th>Shortcut</th><th class="n">Presses</th><th class="barcol"></th>
+        <th class="n">Share</th><th class="n">Apps</th><th>App spread</th>
+        <th>Evidence</th><th>Verdict</th></tr></thead>
       <tbody></tbody>
     </table></div>
   </div>
 
   <div class="cols">
     <div class="panel">
-      <h2>App 分布 <span class="seg sm" id="appSeg" data-noexport></span></h2>
+      <h2>App distribution <span class="seg sm" id="appSeg" data-noexport></span></h2>
       <div id="appDist"></div>
     </div>
     <div class="panel">
-      <h2>修饰键分布 <span class="seg sm" id="modSeg" data-noexport></span></h2>
+      <h2>Modifier distribution <span class="seg sm" id="modSeg" data-noexport></span></h2>
       <div id="modDist"></div>
     </div>
   </div>
 
   <div class="cols">
     <div class="panel">
-      <h2>时段分布 <span class="scope">本地 0–23 时</span><span class="seg sm" id="hodSeg" data-noexport></span></h2>
+      <h2>Time of day <span class="scope">Local time · 0–23</span><span class="seg sm" id="hodSeg" data-noexport></span></h2>
       <div id="hod"></div>
     </div>
     <div class="panel">
-      <h2>趋势 <span class="scope" id="trendScope"></span>
+      <h2>Trend <span class="scope" id="trendScope"></span>
         <span class="seg sm" id="bucketSeg" data-noexport></span><span class="seg sm" id="trendSeg" data-noexport></span></h2>
       <div id="trend"></div>
     </div>
   </div>
 
   <details class="panel" id="detailPanel" open>
-    <summary><span class="sumtitle">明细</span> <span class="scope">组合键 × app</span></summary>
+    <summary><span class="sumtitle">Details</span> <span class="scope">Shortcut × app</span></summary>
     <div class="tablewrap"><table id="detail">
       <thead id="detailHead"></thead>
       <tbody></tbody>
@@ -307,14 +307,14 @@ footer code { color: var(--muted); }
 <div class="sheet" id="shareSheet" hidden>
   <div class="sheet-box">
     <div class="sheet-head">
-      <span id="shareInfo">正在生成…</span>
+      <span id="shareInfo">Generating…</span>
       <span class="sheet-actions">
-        <a id="shareDownload" class="btnlike" download hidden>下载 PNG</a>
-        <button id="shareCopy" hidden>复制到剪贴板</button>
-        <button id="shareClose">关闭</button>
+        <a id="shareDownload" class="btnlike" download hidden>Download PNG</a>
+        <button id="shareCopy" hidden>Copy to clipboard</button>
+        <button id="shareClose">Close</button>
       </span>
     </div>
-    <div class="sheet-body"><img id="shareImg" alt="统计页面快照"></div>
+    <div class="sheet-body"><img id="shareImg" alt="Statistics snapshot"></div>
   </div>
 </div>
 
@@ -330,9 +330,9 @@ const KEYSYM = {
   left: "←", right: "→", up: "↑", down: "↓",
   home: "↖", end: "↘", pageup: "⇞", pagedown: "⇟", help: "?"
 };
-const BUCKET_CN = { hour: "小时", day: "天", week: "周", month: "月" };
+const BUCKET_CN = { hour: "hour", day: "day", week: "week", month: "month" };
 const BUCKET_SECONDS = { hour: 3600, day: 86400, week: 604800, month: 2592000 };
-const BUCKET_AVG = { hour: "小时均", day: "日均", week: "周均", month: "月均" };
+const BUCKET_AVG = { hour: "Avg / hour", day: "Avg / day", week: "Avg / week", month: "Avg / month" };
 const SERIES_MAX = 8;
 
 const prettyMods = m => m ? m.split("+").map(x => SYM[x] || x).join("") : "";
@@ -368,8 +368,8 @@ const LAYOUT = [
    ["alt","⌥"],["left","←"],["up","↑"],["down","↓"],["right","→"]]
 ];
 
-const SINCE_OPTS = [["today", "今天"], ["2d", "48 小时"], ["7d", "7 天"], ["30d", "30 天"],
-                    ["3mo", "3 个月"], ["all", "全部"]];
+const SINCE_OPTS = [["today", "Today"], ["2d", "48 hours"], ["7d", "7 days"], ["30d", "30 days"],
+                    ["3mo", "3 months"], ["all", "All"]];
 
 // "no modifier at all" is a real value of event.mods, so the unfiltered
 // choice cannot also be the empty string: one <select> cannot hold two options
@@ -396,7 +396,7 @@ function fillSelect(sel, values, label, current, allValue = "") {
   sel.append(all);
   for (const v of values) {
     const o = document.createElement("option");
-    o.value = v; o.textContent = v === "" ? "(无修饰键)" : v;
+    o.value = v; o.textContent = v === "" ? "(No modifiers)" : v;
     sel.append(o);
   }
   sel.value = current;
@@ -414,23 +414,23 @@ function segment(node, options, current, onPick) {
 
 // --- marks ----------------------------------------------------------------
 function barList(node, items) {
-  if (!items.length) { node.innerHTML = '<div class="empty">无数据</div>'; return; }
+  if (!items.length) { node.innerHTML = '<div class="empty">No data</div>'; return; }
   const mx = items[0].n;
   node.innerHTML = `<div class="bars">` + items.map((it, i) => `<div class="bar">
-      <span class="lbl" data-tip="${esc(it.label)} · ${fmt(it.n)} 次">${it.html || esc(it.label)}</span>
-      <span class="track" data-tip="${esc(it.label)} · ${fmt(it.n)} 次"><span class="fill${
+      <span class="lbl" data-tip="${esc(it.label)} · ${fmt(it.n)} presses">${it.html || esc(it.label)}</span>
+      <span class="track" data-tip="${esc(it.label)} · ${fmt(it.n)} presses"><span class="fill${
         it.rest ? " rest" : ""}" style="width:${
         Math.max(1, 100 * it.n / mx)}%${it.color ? ";background:" + it.color : ""}"></span></span>
       <span class="num">${fmt(it.n)}</span>
     </div>`).join("") + `</div>`;
 }
 
-// Fold past the eighth slot into "其他" — categorical hues are never cycled.
+// Fold past the eighth slot into "Other" — categorical hues are never cycled.
 function foldSeries(items) {
   if (items.length <= SERIES_MAX) return items.map((it, i) => ({ ...it, color: `var(--s${i + 1})` }));
   const head = items.slice(0, SERIES_MAX - 1).map((it, i) => ({ ...it, color: `var(--s${i + 1})` }));
   const rest = items.slice(SERIES_MAX - 1);
-  head.push({ label: `其他 (${rest.length})`, n: rest.reduce((s, r) => s + r.n, 0), color: "var(--s9)" });
+  head.push({ label: `Other (${rest.length})`, n: rest.reduce((s, r) => s + r.n, 0), color: "var(--s9)" });
   return head;
 }
 
@@ -442,19 +442,19 @@ function capSeries(items, max) {
   if (items.length <= max) return items;
   const head = items.slice(0, max - 1);
   const rest = items.slice(max - 1);
-  head.push({ label: `其他 ${rest.length} 项`, n: rest.reduce((sum, r) => sum + r.n, 0), rest: true });
+  head.push({ label: `Other ${rest.length} items`, n: rest.reduce((sum, r) => sum + r.n, 0), rest: true });
   return head;
 }
 
 function donut(node, items) {
-  if (!items.length) { node.innerHTML = '<div class="empty">无数据</div>'; return; }
+  if (!items.length) { node.innerHTML = '<div class="empty">No data</div>'; return; }
   const total = items.reduce((s, i) => s + i.n, 0);
   const cx = 100, cy = 100, R = 88, r = 54;
   let a = -Math.PI / 2, marks = "";
   if (items.length === 1) {
     marks = `<circle cx="${cx}" cy="${cy}" r="${(R + r) / 2}" fill="none"
       stroke="${items[0].color}" stroke-width="${R - r}"
-      data-tip="${esc(items[0].label)} · ${fmt(total)} 次 · 100%"></circle>`;
+      data-tip="${esc(items[0].label)} · ${fmt(total)} presses · 100%"></circle>`;
   } else {
     for (const it of items) {
       const span = (it.n / total) * Math.PI * 2, b = a + span;
@@ -462,13 +462,13 @@ function donut(node, items) {
       const pt = (ang, rad) => `${(cx + rad * Math.cos(ang)).toFixed(2)} ${(cy + rad * Math.sin(ang)).toFixed(2)}`;
       marks += `<path d="M${pt(a, R)}A${R} ${R} 0 ${big} 1 ${pt(b, R)}L${pt(b, r)}A${r} ${r} 0 ${big} 0 ${pt(a, r)}Z"
         fill="${it.color}" stroke="var(--panel)" stroke-width="2"
-        data-tip="${esc(it.label)} · ${fmt(it.n)} 次 · ${pct(it.n, total)}"></path>`;
+        data-tip="${esc(it.label)} · ${fmt(it.n)} presses · ${pct(it.n, total)}"></path>`;
       a = b;
     }
   }
   // Values live in the legend as well, so identity is never colour-alone.
   node.innerHTML = `<div class="pie">
-      <svg viewBox="0 0 200 200" role="img" aria-label="分布饼图">${marks}</svg>
+      <svg viewBox="0 0 200 200" role="img" aria-label="Distribution chart">${marks}</svg>
       <div class="legend">${items.map(it => `
         <span class="sw" style="background:${it.color}"></span>
         <span class="l" title="${esc(it.label)}">${it.html || esc(it.label)}</span>
@@ -498,7 +498,7 @@ function drawSeries(node, kind, buckets, labelFn) {
     const area = `${x(0).toFixed(1)},${H} ${pts} ${x(buckets.length - 1).toFixed(1)},${H}`;
     const dots = buckets.length <= 40 ? buckets.map((b, i) =>
       `<circle cx="${x(i).toFixed(1)}" cy="${y(b.n).toFixed(1)}" r="4" fill="var(--accent)"
-         vector-effect="non-scaling-stroke" data-tip="${esc(b.label)} · ${fmt(b.n)} 次"></circle>`).join("") : "";
+         vector-effect="non-scaling-stroke" data-tip="${esc(b.label)} · ${fmt(b.n)} presses"></circle>`).join("") : "";
     node.innerHTML = `<div class="chart"><div class="plot">${grid}<div class="lineclip">
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
           <polygon points="${area}" fill="var(--accent)" opacity=".12"></polygon>
@@ -509,7 +509,7 @@ function drawSeries(node, kind, buckets, labelFn) {
   } else {
     node.innerHTML = `<div class="chart"><div class="plot">${grid}<div class="hist">${buckets.map(b =>
       `<div class="col" style="height:${Math.max(2, 100 * b.n / mx)}%" data-tip="${
-        esc(b.label)} · ${fmt(b.n)} 次"></div>`
+        esc(b.label)} · ${fmt(b.n)} presses"></div>`
     ).join("")}</div></div>${axis}</div>`;
   }
 }
@@ -524,7 +524,7 @@ function drawKeyboard(rows) {
     const lvl = n === 0 ? 0 : Math.min(5, 1 + Math.floor(4 * Math.log1p(n) / Math.log1p(mx)));
     const num = n ? `<span class="n">${n > 999 ? (n / 1000).toFixed(1) + "k" : n}</span>` : "";
     return `<div class="key ${cls || ""}" data-lvl="${lvl}" style="background:var(--h${lvl})"
-      data-tip="${esc(label)} · ${fmt(n)} 次"><span>${esc(label)}</span>${num}</div>`;
+      data-tip="${esc(label)} · ${fmt(n)} presses"><span>${esc(label)}</span>${num}</div>`;
   }).join("") + `</div>`).join("");
 }
 
@@ -537,7 +537,7 @@ function bucketKey(d, bucket) {
   if (bucket === "hour") return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:00`;
   if (bucket === "day")  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   if (bucket === "week") { const t = new Date(d); t.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} 周`; }
+    return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} week`; }
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}`;
 }
 
@@ -555,12 +555,12 @@ function render() {
     (DATA.meta.ts_to - DATA.meta.ts_from) / BUCKET_SECONDS[state.bucket]));
 
   el("kpis").innerHTML = [
-    [fmt(total), "带修饰键按键"], [fmt(combos), "独立组合键"],
-    [fmt(apps), "涉及 app"], [fmt(Math.round(total / periods)), BUCKET_AVG[state.bucket]],
+    [fmt(total), "Modified presses"], [fmt(combos), "Unique shortcuts"],
+    [fmt(apps), "Apps used"], [fmt(Math.round(total / periods)), BUCKET_AVG[state.bucket]],
   ].map(([v, k]) => `<div class="kpi"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
 
   drawKeyboard(rows);
-  el("kbScope").textContent = state.app || "全部";
+  el("kbScope").textContent = state.app || "All";
 
   renderCombos(rows, total);
 
@@ -573,7 +573,7 @@ function render() {
   for (const r of rows) modMap.set(r.mods || "", (modMap.get(r.mods || "") || 0) + r.n);
   drawDist(el("modDist"), state.chart.mod,
     [...modMap].sort((a, b) => b[1] - a[1]).map(([mods, n]) =>
-      ({ label: mods ? prettyMods(mods) : "(无修饰键)", html: comboHTML(mods, null), n })));
+      ({ label: mods ? prettyMods(mods) : "(No modifiers)", html: comboHTML(mods, null), n })));
 
   const tl = timelineRows();
   const hod = Array.from({ length: 24 }, (_, i) => ({ label: `${i}:00`, n: 0 }));
@@ -588,18 +588,18 @@ function render() {
   const trend = [...tmap].sort((a, b) => a[0] < b[0] ? -1 : 1).map(([label, n]) => ({ label, n }));
   drawSeries(el("trend"), state.chart.trend, trend,
     (b, i, len) => (i % Math.ceil(len / 12) === 0 ? b.label.slice(5) : ""));
-  el("trendScope").textContent = `按${BUCKET_CN[state.bucket]}` + (state.app ? ` · ${state.app}` : "");
+  el("trendScope").textContent = `By ${BUCKET_CN[state.bucket]}` + (state.app ? ` · ${state.app}` : "");
 
-  const cols = ["组合键", "App", "按键", "占比"];
+  const cols = ["Shortcut", "App", "Presses", "Share"];
   el("detailHead").innerHTML = `<tr>${cols.map(c =>
-    `<th${c === "按键" || c === "占比" ? ' class="n"' : ""}>${c}</th>`).join("")}</tr>`;
+    `<th${c === "Presses" || c === "Share" ? ' class="n"' : ""}>${c}</th>`).join("")}</tr>`;
   const detail = [...rows].sort((a, b) => b.n - a.n).slice(0, 40);
   el("detail").querySelector("tbody").innerHTML = detail.length ? detail.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
       <td class="app">${esc(r.app)}</td>
       <td class="n">${fmt(r.n)}</td>
       <td class="pct">${pct(r.n, total)}</td>
-    </tr>`).join("") : `<tr><td colspan="${cols.length}" class="empty">无数据</td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="${cols.length}" class="empty">No data</td></tr>`;
 }
 
 // A global hotkey is consumed before any app sees it, so "which app was frontmost"
@@ -649,37 +649,37 @@ function renderCombos(rows, total) {
     const focus = sw && sw.hits ? sw.best / sw.hits : null;
 
     // 0 none · 1 too few to mean anything · 2 scattered targets · 3 one target
-    let evidence = 0, evidenceTip = "按完这个键之后，前台 app 从没跟着换过";
+    let evidence = 0, evidenceTip = "No foreground app switch followed this shortcut";
     if (sw && sw.hits) {
       const share = Math.round(focus * 100);
       if (sw.hits < MIN_SWITCH_HITS) {
         evidence = 1;
-        evidenceTip = `只有 ${sw.hits} 次按完切到了别的 app，次数太少说明不了什么`
-          + "（关掉窗口也会让下一个 app 顶上来）";
+        evidenceTip = `Only ${sw.hits} foreground switches followed; too few to draw a conclusion`
+          + " (closing a window can also bring another app forward)";
       } else if (focus >= FOCUS_MIN) {
         evidence = 3;
-        evidenceTip = `${sw.hits} 次按完前台切走，其中 ${share}% 都切到 ${sw.target}`;
+        evidenceTip = `${sw.hits} foreground switches followed; ${share}% went to ${sw.target}`;
       } else {
         evidence = 2;
-        evidenceTip = `${sw.hits} 次按完前台切走，但目标散在 ${sw.targets} 个 app 上`
-          + `（最常见的 ${sw.target} 也只占 ${share}%）`;
+        evidenceTip = `${sw.hits} foreground switches went to ${sw.targets} apps`
+          + ` (the most common, ${sw.target}, accounted for ${share}%)`;
       }
     }
 
     let verdict, cls;
     if (sw && sw.hits >= MIN_SWITCH_HITS && focus >= FOCUS_MIN) {
-      verdict = `全局 → ${sw.target}`; cls = "s1";
+      verdict = `Global → ${sw.target}`; cls = "s1";
     } else if (sw && sw.hits >= MIN_SWITCH_HITS) {
-      verdict = "全局 · 切换类"; cls = "s3";
-    } else if (c.apps.size >= 4 && spread >= 0.6) { verdict = "疑似全局"; cls = "s4"; }
-    else if (c.apps.size === 1) { verdict = "app 内"; cls = "s9"; }
-    else { verdict = "不确定"; cls = "s9"; }
+      verdict = "Global · switcher"; cls = "s3";
+    } else if (c.apps.size >= 4 && spread >= 0.6) { verdict = "Likely global"; cls = "s4"; }
+    else if (c.apps.size === 1) { verdict = "In-app"; cls = "s9"; }
+    else { verdict = "Uncertain"; cls = "s9"; }
     return { ...c, spread, focus, switches: sw ? sw.hits : 0,
              targets: sw ? sw.targets : 0, evidence, evidenceTip, verdict, cls };
   }).sort((a, b) => b.n - a.n).slice(0, 16);
 
-  el("comboNote").textContent = "按使用次数排序 · 跨 app = 专属某个 app，还是到处都在用"
-    + " · 证据 = 按完键之后前台 app 有没有跟着换";
+  el("comboNote").textContent = "Sorted by usage · App spread shows whether a shortcut is used in one app or many"
+    + " · Evidence shows whether the foreground app changed after a press";
   const mx = list.length ? list[0].n : 1;
   el("comboTable").querySelector("tbody").innerHTML = list.length ? list.map(r => `<tr>
       <td>${comboHTML(r.mods, r.key)}</td>
@@ -689,38 +689,38 @@ function renderCombos(rows, total) {
       <td class="pct">${pct(r.n, total)}</td>
       <td class="n">${r.apps.size}</td>
       <td class="meter-cell">${meter(Math.round(r.spread * 5), 5,
-        `在 ${r.apps.size} 个 app 里用过 · 跨 app ${r.spread.toFixed(2)}`
-        + "（0 = 只在一个 app 里用，1 = 在各 app 里用得一样多）")}</td>
+        `Used in ${r.apps.size} apps · spread ${r.spread.toFixed(2)}`
+        + " (0 = one app, 1 = evenly across apps)")}</td>
       <td class="meter-cell">${meter(r.evidence, 3, r.evidenceTip)}</td>
       <td class="verdict"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--${r.cls});margin-right:6px"></span>${esc(r.verdict)}</td>
-    </tr>`).join("") : `<tr><td colspan="8" class="empty">无数据</td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="8" class="empty">No data</td></tr>`;
 }
 
 function refreshSelects() {
   const keep = (sel, v, allValue) => {
     if ([...sel.options].some(o => o.value === v)) sel.value = v; else sel.value = allValue;
   };
-  fillSelect(el("fApp"), [...new Set(DATA.combos.map(r => r.app))], "全部 app", state.app);
+  fillSelect(el("fApp"), [...new Set(DATA.combos.map(r => r.app))], "All apps", state.app);
   fillSelect(el("fMods"), [...new Set(DATA.combos.map(r => r.mods || ""))]
-    .sort((a, b) => a.length - b.length), "全部修饰键", state.mods, ALL_MODS);
+    .sort((a, b) => a.length - b.length), "All modifiers", state.mods, ALL_MODS);
   keep(el("fApp"), state.app, ""); keep(el("fMods"), state.mods, ALL_MODS);
   state.app = el("fApp").value; state.mods = el("fMods").value;
-  el("fApp").title = state.app || "全部 app";
+  el("fApp").title = state.app || "All apps";
 }
 
 function renderAll() {
   const m = DATA.meta;
-  el("sub").textContent = `范围 ${m.since} · ${m.first_event || "—"} → ${m.last_event || "—"} · `
-    + `${fmt(m.total)} 次按键 · ${fmt(m.combos)} 个组合键 · ${fmt(m.apps)} 个 app`;
+  el("sub").textContent = `Range ${m.since} · ${m.first_event || "—"} → ${m.last_event || "—"} · `
+    + `${fmt(m.total)} presses · ${fmt(m.combos)} shortcuts · ${fmt(m.apps)} apps`;
   refreshSelects();
   render();
   el("foot").innerHTML = API
     ? `<span class="dot${state.paused ? " off" : ""}"></span>
-       <span>${state.paused ? "已暂停" : `每 ${POLL_MS / 1000}s 自动刷新`} · 更新于 ${
+       <span>${state.paused ? "Paused" : `Refresh every ${POLL_MS / 1000}s`} · Updated ${
          new Date().toLocaleTimeString()}</span>
-       <button id="pause" data-noexport>${state.paused ? "继续" : "暂停"}</button>`
-    : `<span>静态快照 · 数据来源 <code>~/.local/share/keystats/keystats.db</code> ·
-       实时看板：<code>keystats serve --open</code></span>`;
+       <button id="pause" data-noexport>${state.paused ? "Resume" : "Pause"}</button>`
+    : `<span>Static snapshot · source <code>~/.local/share/keystats/keystats.db</code> ·
+       Live dashboard: <code>keystats serve --open</code></span>`;
   if (API) el("pause").onclick = () => { state.paused = !state.paused; renderAll(); };
 }
 
@@ -741,7 +741,7 @@ async function load(force) {
     DATA = next;
     renderAll();
   } catch (err) {
-    el("foot").innerHTML = `<span class="dot off"></span><span>读取失败：${esc(err.message)}</span>`;
+    el("foot").innerHTML = `<span class="dot off"></span><span>Load failed: ${esc(err.message)}</span>`;
   }
 }
 
@@ -837,7 +837,7 @@ async function renderShareImage(scale = 2) {
   const img = new Image();
   await new Promise((resolve, reject) => {
     img.onload = resolve;
-    img.onerror = () => reject(new Error("快照渲染失败"));
+    img.onerror = () => reject(new Error("Snapshot rendering failed"));
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   });
 
@@ -867,11 +867,11 @@ function initShare() {
   btn.onclick = async () => {
     btn.disabled = true;
     const label = btn.textContent;
-    btn.textContent = "生成中…";
+    btn.textContent = "Generating…";
     el("shareImg").removeAttribute("src");
     el("shareDownload").hidden = true;
     el("shareCopy").hidden = true;
-    el("shareInfo").textContent = "正在生成…";
+    el("shareInfo").textContent = "Generating…";
     sheet.hidden = false;
     try {
       const { blob, width, height } = await renderShareImage();
@@ -886,22 +886,22 @@ function initShare() {
       dl.download = `keystats-${DATA.meta.since}-${stamp}.png`;
       dl.hidden = false;
       el("shareInfo").textContent = `${width}×${height} · ${Math.round(blob.size / 1024)} KB`
-        + (el("detailPanel").open ? " · 含明细" : " · 明细已折叠");
+        + (el("detailPanel").open ? " · details included" : " · details collapsed");
       if (navigator.clipboard && window.ClipboardItem) {
         const copy = el("shareCopy");
         copy.hidden = false;
-        copy.textContent = "复制到剪贴板";
+        copy.textContent = "Copy to clipboard";
         copy.onclick = async () => {
           try {
             await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-            copy.textContent = "已复制";
+            copy.textContent = "Copied";
           } catch (err) {
-            copy.textContent = "复制失败";
+            copy.textContent = "Copy failed";
           }
         };
       }
     } catch (err) {
-      el("shareInfo").textContent = `生成失败：${err.message}`;
+      el("shareInfo").textContent = `Generation failed: ${err.message}`;
     } finally {
       btn.disabled = false;
       btn.textContent = label;
@@ -910,8 +910,8 @@ function initShare() {
 }
 
 function init() {
-  const dist = [["bar", "条形"], ["pie", "饼图"]];
-  const series = [["bar", "柱状"], ["line", "折线"]];
+  const dist = [["bar", "Bar"], ["pie", "Pie"]];
+  const series = [["bar", "Bar"], ["line", "Line"]];
   segment(el("bucketSeg"), Object.entries(BUCKET_CN), state.bucket, v => { state.bucket = v; render(); });
   segment(el("appSeg"), dist, state.chart.app, v => { state.chart.app = v; render(); });
   segment(el("modSeg"), dist, state.chart.mod, v => { state.chart.mod = v; render(); });
@@ -950,8 +950,8 @@ function init() {
 
 if (API || (DATA && DATA.combos && DATA.combos.length)) init();
 else document.querySelector(".wrap").innerHTML =
-  '<header><h1>Keystats</h1></header><div class="panel"><div class="empty">该时间范围内没有数据。'
-  + '先让采集器跑一会儿，再运行 <code>keystats report</code>，或用 <code>keystats serve</code> 看实时看板。</div></div>';
+  '<header><h1>Keystats</h1></header><div class="panel"><div class="empty">No data in this time range. '
+  + 'Let the collector run, then run <code>keystats report</code> or use <code>keystats serve</code> to view the live dashboard.</div></div>';
 </script>
 </body>
 </html>

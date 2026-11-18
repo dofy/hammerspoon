@@ -5,7 +5,7 @@
 
 local M = {}
 
-M.label = "电池"
+M.label = "Battery"
 M.interval = 30
 
 M.config = {
@@ -46,27 +46,27 @@ function M.render(ctx)
         title = hs.styledtext.new(text, {color = {red = 0.9, green = 0.2, blue = 0.2}})
     end
 
-    local tooltip = onAC and "电源适配器" or "电池供电"
+    local tooltip = onAC and "AC power" or "Battery power"
     local left = remainingText()
-    if left then tooltip = tooltip .. "  剩余 " .. left end
+    if left then tooltip = tooltip .. "  Remaining " .. left end
 
     return {title = title, tooltip = tooltip}
 end
 
 function M.menu(ctx)
     local items = {
-        {title = string.format("电量  %d%%", math.floor((hs.battery.percentage() or 0) + 0.5)), disabled = true},
-        {title = "电源  " .. (hs.battery.powerSource() or "unknown"), disabled = true}
+        {title = string.format("Charge  %d%%", math.floor((hs.battery.percentage() or 0) + 0.5)), disabled = true},
+        {title = "Power  " .. (hs.battery.powerSource() or "unknown"), disabled = true}
     }
 
     local left = remainingText()
-    items[#items + 1] = {title = "剩余  " .. (left or "计算中"), disabled = true}
+    items[#items + 1] = {title = "Remaining  " .. (left or "Calculating…"), disabled = true}
 
     local cycles = hs.battery.cycles()
-    if cycles then items[#items + 1] = {title = "循环  " .. cycles, disabled = true} end
+    if cycles then items[#items + 1] = {title = "Cycles  " .. cycles, disabled = true} end
 
     local health = hs.battery.health()
-    if health then items[#items + 1] = {title = "健康  " .. health, disabled = true} end
+    if health then items[#items + 1] = {title = "Health  " .. health, disabled = true} end
 
     return items
 end

@@ -20,6 +20,7 @@ M.config = {
 }
 
 local tap, binding, watchdog, animationTimer
+local statusCanvas, statusTimer, statusFadeTimer
 local active = false
 local rows, currentTextRow, lastRepeatRow = {}, nil, nil
 local special = {
@@ -276,12 +277,51 @@ function M.setEnabled(enabled)
     if not active then clearRows() end
 end
 
+local function showToggleStatus()
+    local screen = hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
+    if not screen then return end
+    local bounds = screen:fullFrame()
+    local w, h = 220, 68
+    local frame = { x = bounds.x + (bounds.w - w) / 2, y = bounds.y + (bounds.h - h) / 2, w = w, h = h }
+    if statusTimer then statusTimer:stop(); statusTimer = nil end
+    if statusFadeTimer then statusFadeTimer:stop(); statusFadeTimer = nil end
+    if not statusCanvas then
+        statusCanvas = hs.canvas.new(frame)
+        statusCanvas:level(hs.canvas.windowLevels.overlay)
+        statusCanvas:behavior({ "canJoinAllSpaces", "fullScreenAuxiliary", "stationary", "ignoresCycle" })
+        statusCanvas:clickActivating(false)
+    end
+    statusCanvas:hide()
+    statusCanvas:alpha(1)
+    statusCanvas:frame(frame)
+    statusCanvas:replaceElements({
+        { type = "rectangle", action = "fill", roundedRectRadii = { xRadius = 16, yRadius = 16 }, fillColor = { white = 0, alpha = 0.85 } },
+        { type = "text", text = "Keycast " .. (active and "✓" or "✕"), textColor = { white = 1 }, textSize = 27,
+            textAlignment = "center", frame = { x = 8, y = 16, w = w - 16, h = 36 } },
+    }):show()
+    statusTimer = hs.timer.doAfter(1, function()
+        statusTimer = nil
+        local start = hs.timer.secondsSinceEpoch()
+        statusFadeTimer = hs.timer.doEvery(1 / 30, function()
+            local opacity = math.max(0, 1 - (hs.timer.secondsSinceEpoch() - start) / 0.2)
+            if statusCanvas then statusCanvas:alpha(opacity) end
+            if opacity <= 0 then
+                if statusCanvas then statusCanvas:hide() end
+                if statusFadeTimer then statusFadeTimer:stop(); statusFadeTimer = nil end
+            end
+        end)
+    end)
+end
+
 function M.toggle()
     M.setEnabled(not active)
-    hs.alert.show("按键提示：" .. (active and "开启" or "关闭"), 1)
+    showToggleStatus()
 end
 function M.stop()
     M.setEnabled(false)
+    if statusTimer then statusTimer:stop(); statusTimer = nil end
+    if statusFadeTimer then statusFadeTimer:stop(); statusFadeTimer = nil end
+    if statusCanvas then statusCanvas:delete(); statusCanvas = nil end
     if binding then binding:delete(); binding = nil end
     if watchdog then watchdog:stop(); watchdog = nil end
     tap = nil

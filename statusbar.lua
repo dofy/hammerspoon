@@ -120,7 +120,7 @@ end
 local function buildMenu(entry)
     local items = guard(entry.name, entry.widget.menu, entry.ctx) or {}
     if #items > 0 then items[#items + 1] = {title = "-"} end
-    items[#items + 1] = {title = "刷新", fn = function() render(entry) end}
+    items[#items + 1] = {title = "Refresh", fn = function() render(entry) end}
     return items
 end
 

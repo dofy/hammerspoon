@@ -96,7 +96,7 @@ labelled scale, because a chart read only through its tooltip says nothing once 
 image; and a combination × app detail table. Everything re-pivots client-side from the app and modifier
 selectors.
 
-**生成分享图** rasterises the page itself into a PNG — preview, download, or copy to the
+**Share image** rasterises the page itself into a PNG — preview, download, or copy to the
 clipboard. It needs no library and works from `file://`: the page is cloned into an
 `<svg><foreignObject>` together with its own stylesheet and drawn onto a canvas at 2×, which
 stays untainted only because the page loads no external image or font. Inside that SVG the clone
@@ -112,7 +112,7 @@ One delegated `pointermove` listener positions a single bubble, clamped to the v
 clears it whenever the page re-renders underneath it.
 
 Window titles were collected until 2026-10-22 and then dropped: in the apps that carry the most
-shortcuts the title was a constant (`微信`, `飞书`) and added nothing to the app name, while the
+shortcuts the title was a constant (`WeChat`, `Feishu`) and added nothing to the app name, while the
 apps with many titles — a browser, a chat client — contributed a fresh row per page, 45% of them
 seen exactly once. The dimension cost a filter, a panel, a detail column and an API branch, and
 it was the only thing in the database recording *what* was on screen rather than which keys were
@@ -124,7 +124,7 @@ collection time (a repository or session name parsed out of the title), not in t
 An event tap sees a keystroke *before* any app or global hotkey handler consumes it, so the only
 app it can record is whoever was frontmost. A Raycast or Karabiner binding pressed while Cursor
 is in front is therefore filed under Cursor. Two signals narrow it down, and `keystats global`
-(and the dashboard's **全局 vs app 内** panel) report both:
+(and the dashboard's **Global vs in-app** panel) report both:
 
 - **switch hits** — when an app activation lands within `config.globalSwitchWindow` (0.6s) of a
   keystroke, that target app is stored on the event. Only counts from three hits up: closing the
@@ -132,7 +132,7 @@ is in front is therefore filed under Cursor. Two signals narrow it down, and `ke
 - **focus** — the share of those activations that went to the most common target. A launcher
   always lands on the same app; `⌘Tab` scatters over everything, which reads as *switcher* rather
   than a launcher for any one app.
-- **跨 app / spread** — whether the combination belongs to one application or turns up
+- **App spread** — whether the combination belongs to one application or turns up
   everywhere. It is the Shannon entropy of its distribution over apps normalised by
   `log2(apps in range)`, which counts the balance and not just the number of apps: 100 presses in
   Chrome and one in Finder is two apps but still Chrome's shortcut. Four or more apps and a
@@ -262,9 +262,9 @@ Nerd Font glyph works as `symbol` (`MesloLGS NF` carries real outlines for `nf-m
 `\u{F01C1}` and friends), but only with `font` pointing at a patched font — macOS fallback for
 those private-use codepoints is not guaranteed to find one.
 
-Two numbers in the dropdown disagree on purpose. `今日` comes from `/users/me/budget`, the counter
-the Kaon console's own banner shows and the one that actually gates requests. `按天 (Prometheus)`
-comes from `/usage/summary`, which read about 8 USD higher for the same date. Trust `今日`.
+Two numbers in the dropdown disagree on purpose. `Today` comes from `/users/me/budget`, the counter
+the Kaon console's own banner shows and the one that actually gates requests. `By day (Prometheus)`
+comes from `/usage/summary`, which read about 8 USD higher for the same date. Trust `Today`.
 There is no breakdown for today alone: the only range tokens are `5m | 1h | 24h | 7d | 30d`, and
 `24h` comes back as five one-minute buckets rather than a day, so the breakdown covers seven days
 and says so. It splits that range by model, by inference key and by provider. The provider rows
@@ -273,7 +273,7 @@ still reporting its cost.
 
 A 401, 403 or 429 stops the widget instead of retrying — `automation_protocol_throttled` and
 `automation_token_suspended` are stop signals in Kaon's contract, and hammering through them
-risks the token being suspended. Clear the stopped state from the dropdown's **重试**, or by
+risks the token being suspended. Clear the stopped state from the dropdown's **Retry**, or by
 toggling the widget off and on.
 
 #### Writing a widget
@@ -316,7 +316,7 @@ as its tooltip, and the other widgets keep running.
 
 ## Keycast
 
-`keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press **⌃⌥⌘K** to toggle it. It does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
+`keycast.lua` displays keystrokes in a temporary overlay. It starts off by default; press **⌃⌥⌘K** to toggle it. A single status panel appears at the center of the pointer’s screen, updates in place when toggled repeatedly, and fades out after one second. Keycast does not record input. Configure it in `init.local.lua` before reloading; examples are in `init.local.example.lua`.
 
 For a screen-corner overlay with physical key labels and repeat badges, add this to `init.local.lua`:
 

@@ -27,7 +27,7 @@ end
 local function remember(uuid, mode, value)
     saved[uuid] = { mode = mode, value = value }
     local ok = pcall(hs.settings.set, settingsKey, saved)
-    if not ok then notify("亮度已调整，但保存失败", uuid) end
+    if not ok then notify("⚠ Brightness changed; save failed", uuid) end
 end
 
 local function showBrightness(uuid, name, value, maximum)
@@ -113,7 +113,7 @@ local function run(args, callback, epoch, uuid)
         active = nil
         queue = {}
         command:terminate()
-        notify("DDC 命令超时，亮度状态未确认", uuid)
+        notify("⚠ DDC timed out; brightness unconfirmed", uuid)
     end)
 end
 
@@ -170,10 +170,10 @@ processQueue = function()
     local screen = hs.screen.find(item.uuid)
     if not screen or screen:getUUID():upper() ~= item.uuid:upper() then
         ddc[item.uuid] = nil
-        notify("目标显示器已断开，未调整", item.uuid)
+        notify("⚠ Display disconnected", item.uuid)
         processQueue(); return
     end
-    local name = screen:name() or "显示器"
+    local name = screen:name() or "Display"
     local native = screen:getBrightness()
     if type(native) == "number" then
         if item.restore and item.restore.mode ~= "native" then processQueue(); return end
@@ -181,7 +181,7 @@ processQueue = function()
         local ok = pcall(function() screen:setBrightness(value) end)
         local actual = screen:getBrightness()
         if not ok or type(actual) ~= "number" or math.abs(actual - value) > 0.02 then
-            notify(name .. "亮度调整未确认", item.uuid)
+            notify(name .. " brightness unconfirmed", item.uuid)
         else
             if not item.restore then remember(item.uuid, "native", actual) end
             showBrightness(item.uuid, name, actual, 1)
@@ -191,7 +191,7 @@ processQueue = function()
     if item.restore and item.restore.mode ~= "ddc" then processQueue(); return end
     if not findCLI() then
         ddc[item.uuid] = nil
-        notify("未找到 m1ddc；请安装或设置本机路径", item.uuid)
+        notify("⚠ m1ddc not found; install it or configure its path", item.uuid)
         processQueue(); return
     end
     local epoch = generation
@@ -207,7 +207,7 @@ processQueue = function()
             if ddc[item.uuid] ~= state then processQueue(); return end
             if not value then
                 ddc[item.uuid] = nil
-                notify(name .. " DDC 读取亮度失败", item.uuid)
+                notify(name .. " ⚠ DDC read failed", item.uuid)
                 processQueue(); return
             end
             state.value, state.written, state.max = value, value, maximum
@@ -229,7 +229,7 @@ processQueue = function()
         local written = output and tonumber(output:match("Writing%s+(%d+)"))
         if code ~= 0 or written ~= value then
             ddc[item.uuid] = nil -- re-read the monitor on the next press
-            notify(name .. " DDC 调整失败", item.uuid)
+            notify(name .. " ⚠ DDC adjustment failed", item.uuid)
             processQueue(); return
         end
         state.written, state.value = value, value
@@ -242,7 +242,7 @@ end
 function M.adjustMouseScreen(delta)
     local screen = hs.mouse.getCurrentScreen()
     local uuid = screen and screen:getUUID()
-    if not uuid then notify("无法识别鼠标所在的显示器"); return end
+    if not uuid then notify("⚠ Cannot identify pointer display"); return end
     revisions[uuid] = (revisions[uuid] or 0) + 1
     if restoreTimers[uuid] then restoreTimers[uuid]:stop(); restoreTimers[uuid] = nil end
     if type(screen:getBrightness()) == "number" then
@@ -253,7 +253,7 @@ function M.adjustMouseScreen(delta)
         local state = ddcState(uuid)
         if state.value then
             state.target = clamp(state.target + delta, state.max)
-            showBrightness(uuid, screen:name() or "显示器", state.target, state.max)
+            showBrightness(uuid, screen:name() or "Display", state.target, state.max)
         else
             state.pending, state.restoreTo = state.pending + delta, nil -- a press overrides a restore
         end
@@ -309,7 +309,7 @@ function M.start()
     saved = type(stored) == "table" and stored or {}
     connected = screenSet()
     screenWatcher = hs.screen.watcher.new(screenChanged):start()
-    if not findCLI() then notify("未找到 m1ddc：外接显示器 DDC 控制不可用") end
+    if not findCLI() then notify("⚠ m1ddc not found; DDC unavailable") end
     local types = hs.eventtap.event.types
     local keys = { [hs.keycodes.map.f1] = -1, [hs.keycodes.map.f2] = 1,
         [hs.keycodes.map.f14] = -1, [hs.keycodes.map.f15] = 1 }
@@ -335,7 +335,7 @@ function M.start()
     local up = hs.hotkey.bind(mods, "]", function() M.adjustMouseScreen(M.config.step) end)
     if down then hotkeys[#hotkeys + 1] = down end
     if up then hotkeys[#hotkeys + 1] = up end
-    if not down or not up then notify("显示器亮度组合快捷键注册失败") end
+    if not down or not up then notify("⚠ Brightness hotkey registration failed") end
     watchdog = hs.timer.doEvery(10, function()
         if keyTap and not keyTap:isEnabled() then keyTap:start() end
     end)

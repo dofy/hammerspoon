@@ -304,9 +304,9 @@ end
 local function expiryNote()
     if not expiresAt then return nil end
     local days = math.floor((expiresAt - now()) / 86400)
-    if days < 0 then return "token 已过期" end
+    if days < 0 then return "Token expired" end
     if days <= M.config.expiryWarnDays then
-        return string.format("token %d 天后过期", days)
+        return string.format("Token expires in %d days", days)
     end
     return nil
 end
@@ -321,7 +321,7 @@ function M.render(ctx)
     end
     if not budget then
         local t = titleFields("…")
-        t.tooltip = lastError or "Kaon: 读取中"
+        t.tooltip = lastError or "Kaon: loading"
         return t
     end
 
@@ -336,15 +336,15 @@ function M.render(ctx)
                                  M.config.budgetSeparator, M.config.symbol, cap)
     end
 
-    local tip = {string.format("今日 $%.2f", spend)}
+    local tip = {string.format("Today $%.2f", spend)}
     if cap then
-        tip[#tip + 1] = string.format("预算 $%.0f  剩余 $%.2f", cap, cap - spend)
+        tip[#tip + 1] = string.format("Budget $%.0f  Remaining $%.2f", cap, cap - spend)
     end
-    if lastError then tip[#tip + 1] = "上次失败: " .. lastError end
+    if lastError then tip[#tip + 1] = "Last error: " .. lastError end
     local note = expiryNote()
     if note then tip[#tip + 1] = note end
     if lastOK then
-        tip[#tip + 1] = "更新于 " .. os.date("%H:%M", lastOK)
+        tip[#tip + 1] = "Updated " .. os.date("%H:%M", lastOK)
     end
 
     local t = titleFields(text, titleColor(ratio()))
@@ -372,7 +372,7 @@ local function budgetLine(label, spend, cap)
     if type(cap) ~= "number" then
         return string.format("%s  %s", label, money(spend))
     end
-    return string.format("%s  %s / $%.0f  (剩 %s)", label, money(spend), cap,
+    return string.format("%s  %s / $%.0f  (%s left)", label, money(spend), cap,
                          money(cap - (spend or 0)))
 end
 
@@ -391,10 +391,10 @@ function M.menu(ctx)
     local items = {}
 
     if fatal then
-        items[#items + 1] = {title = "已停止: " .. fatal, disabled = true}
+        items[#items + 1] = {title = "Stopped: " .. fatal, disabled = true}
         items[#items + 1] = {title = "-"}
         items[#items + 1] = {
-            title = "重试 (清除停止状态)",
+            title = "Retry (clear stopped state)",
             fn = function()
                 fatal, failures, nextFetch = nil, 0, 0
                 ctx.update()
@@ -405,12 +405,12 @@ function M.menu(ctx)
 
     if budget then
         items[#items + 1] = {
-            title = budgetLine("今日", budget.personal_daily_spend_usd,
+            title = budgetLine("Today", budget.personal_daily_spend_usd,
                                budget.personal_daily_budget_usd),
             disabled = true
         }
         items[#items + 1] = {
-            title = budgetLine("本周", budget.personal_weekly_spend_usd,
+            title = budgetLine("This week", budget.personal_weekly_spend_usd,
                                budget.personal_weekly_budget_usd),
             disabled = true
         }
@@ -424,24 +424,24 @@ function M.menu(ctx)
             type(monthSpend) == "number" and
             monthSpend >= (budget.personal_daily_spend_usd or 0) then
             items[#items + 1] = {
-                title = budgetLine("本月", monthSpend, monthCap),
+                title = budgetLine("This month", monthSpend, monthCap),
                 disabled = true
             }
         end
         if type(budget.hard_limit_usd) == "number" then
             items[#items + 1] = {
-                title = "硬上限  " .. money(budget.hard_limit_usd),
+                title = "Hard limit  " .. money(budget.hard_limit_usd),
                 disabled = true
             }
         end
         items[#items + 1] = {
-            title = string.format("限速  %s RPM / %s TPM",
+            title = string.format("Rate limit  %s RPM / %s TPM",
                                   count(budget.rate_limit_rpm),
                                   count(budget.rate_limit_tpm)),
             disabled = true
         }
     else
-        items[#items + 1] = {title = lastError or "读取中…", disabled = true}
+        items[#items + 1] = {title = lastError or "Loading…", disabled = true}
     end
 
     -- The summary cannot be narrowed to today, so it is labelled by its range
@@ -451,7 +451,7 @@ function M.menu(ctx)
         items[#items + 1] = {title = "-"}
         local totals = summary.totals or {}
         items[#items + 1] = {
-            title = string.format("近 %s  %s · %s 次 · %s token", range,
+            title = string.format("Last %s  %s · %s requests · %s tokens", range,
                                   money(totals.total_cost_usd),
                                   count(totals.total_requests or 0),
                                   count(totals.total_tokens or 0)),
@@ -469,7 +469,7 @@ function M.menu(ctx)
                 if label == nil or label == "" then label = "unknown" end
                 if withRequests then
                     sub[#sub + 1] = {
-                        title = string.format("%s  %s · %s 次", label,
+                        title = string.format("%s  %s · %s requests", label,
                                               money(r.total_cost_usd),
                                               count(r.total_requests or 0)),
                         disabled = true
@@ -483,14 +483,14 @@ function M.menu(ctx)
                 end
             end
             items[#items + 1] = {
-                title = title .. " (近 " .. range .. ")",
+                title = title .. " (last " .. range .. ")",
                 menu = sub
             }
         end
 
-        breakdown("按模型", summary.by_model, "model", true)
-        breakdown("按 Key", summary.by_key, "api_key_name", true)
-        breakdown("按供应商", summary.by_provider, "provider_id", false)
+        breakdown("By model", summary.by_model, "model", true)
+        breakdown("By key", summary.by_key, "api_key_name", true)
+        breakdown("By provider", summary.by_provider, "provider_id", false)
 
         local days = summary.by_day or {}
         if #days > 0 then
@@ -498,7 +498,7 @@ function M.menu(ctx)
             for i = #days, 1, -1 do
                 local d = days[i]
                 sub[#sub + 1] = {
-                    title = string.format("%s  %s · %d 次", d.date or "?",
+                    title = string.format("%s  %s · %d requests", d.date or "?",
                                           money(d.total_cost_usd),
                                           d.total_requests or 0),
                     disabled = true
@@ -506,10 +506,10 @@ function M.menu(ctx)
             end
             sub[#sub + 1] = {title = "-"}
             sub[#sub + 1] = {
-                title = "与「今日」不一致属正常: 来源不同",
+                title = "May differ from Today: different sources",
                 disabled = true
             }
-            items[#items + 1] = {title = "按天 (Prometheus)", menu = sub}
+            items[#items + 1] = {title = "By day (Prometheus)", menu = sub}
         end
     end
 
@@ -521,15 +521,15 @@ function M.menu(ctx)
 
     items[#items + 1] = {title = "-"}
     items[#items + 1] = {
-        title = "打开控制台",
+        title = "Open console",
         fn = function()
             hs.urlevent.openURL("https://kaon-router-admin.kaonai.com/usage")
         end
     }
-    -- The host already appends a plain "刷新", which only redraws and lets the
+    -- The host already appends a plain "Refresh", which only redraws and lets the
     -- backoff stand. This one ignores both and refetches the breakdown as well.
     items[#items + 1] = {
-        title = "强制重新拉取",
+        title = "Force refresh",
         fn = function()
             nextFetch = 0
             summary = nil

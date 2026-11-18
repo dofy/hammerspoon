@@ -2,24 +2,24 @@
 -- Manual reload with hotkey
 hs.hotkey.bind({ "cmd", "alt", "ctrl" }, "r", function() hs.reload() end)
 
--- hs.ipc: 允许 `hs -c "..."` 从终端查询运行中的配置
+-- hs.ipc: allow `hs -c "..."` to query the running configuration
 require("hs.ipc")
 
--- Load modules. 这里只设所有机器共用的默认值；本机个性化改 init.local.lua。
+-- Load modules. Shared defaults only; machine-specific settings belong in init.local.lua.
 local mouseFollow = require("mouse-follow")
 mouseFollow.config.moveDelay = 0.0
 mouseFollow.config.clickDetectWindow = 0.3
 
--- Keystats: 记录带修饰键的按键，供 `keystats` CLI 统计快捷键使用情况
+-- Keystats: record modified keystrokes for shortcut statistics in the `keystats` CLI
 local keystats = require("keystats")
 
--- Statusbar: 状态栏挂载入口，widget 放在 statusbar/ 下。
--- 挂哪些 widget、各自参数都是每台机器自己的事，写在 init.local.lua 里；这里不挂任何 widget。
+-- Statusbar: menu-bar host; widgets live under statusbar/.
+-- Widget selection and settings belong in init.local.lua; none are mounted here.
 local statusbar = require("statusbar")
 local displayBrightness = require("display-brightness")
 local keycast = require("keycast")
 
--- 按顺序启动的模块。init.local.lua 可以改它们的 config，或把某项设为 nil 不启动。
+-- Modules start in order; init.local.lua can change config or set a module to nil.
 local modules = {
     mouseFollow = mouseFollow,
     keystats = keystats,
@@ -29,7 +29,7 @@ local modules = {
 }
 local startOrder = { "mouseFollow", "keystats", "statusbar", "displayBrightness", "keycast" }
 
--- Per-machine overrides: init.local.lua 被 git 忽略，不存在时从 init.local.example.lua 复制。
+-- Per-machine overrides: init.local.lua is git-ignored and copied from the example when missing.
 local configDir = hs.configdir .. "/"
 local localPath = configDir .. "init.local.lua"
 local examplePath = configDir .. "init.local.example.lua"
@@ -49,7 +49,7 @@ if hs.fs.attributes(localPath) then
     if ok then ok, err = pcall(chunk, modules) end
     if not ok then
         print("init.local.lua failed: " .. tostring(err))
-        hs.alert.show("⚠️ init.local.lua 出错，见 Console", 4)
+        hs.alert.show("⚠️ init.local.lua error; see Console", 4)
     end
 end
 

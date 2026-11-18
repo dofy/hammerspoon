@@ -38,7 +38,7 @@
 
 local M = {}
 
-M.label = "网速"
+M.label = "Network"
 M.interval = nil -- sampling has its own timer; see the note above
 
 M.config = {
@@ -145,7 +145,7 @@ local function sample(ctx)
     local name = currentInterface()
     if not name then
         iface, rate, last, totals = nil, nil, nil, nil
-        lastError = "没有活动的网络接口"
+        lastError = "No active network interface"
         ctx.update()
         return
     end
@@ -155,7 +155,7 @@ local function sample(ctx)
         local rx, tx = nil, nil
         if code == 0 then rx, tx = parse(out or "") end
         if not rx then
-            lastError = "netstat 读取失败: " .. name
+            lastError = "netstat read failed: " .. name
             ctx.update()
             return
         end
@@ -180,7 +180,7 @@ local function sample(ctx)
 
     if not task:start() then
         task = nil
-        lastError = "无法启动 netstat"
+        lastError = "Could not start netstat"
     end
 end
 
@@ -263,31 +263,31 @@ function M.menu(ctx)
         items[#items + 1] = {title = lastError, disabled = true}
     end
     items[#items + 1] = {
-        title = "接口  " .. (iface or "-") ..
-            (ctx.config.interface and "（固定）" or "（自动）"),
+        title = "Interface  " .. (iface or "-") ..
+            (ctx.config.interface and " (fixed)" or " (auto)"),
         disabled = true
     }
     if rate then
         items[#items + 1] = {
-            title = string.format("当前  ↑ %s/s   ↓ %s/s", bytesText(rate.tx),
+            title = string.format("Now  ↑ %s/s   ↓ %s/s", bytesText(rate.tx),
                                   bytesText(rate.rx)),
             disabled = true
         }
     end
     items[#items + 1] = {
-        title = string.format("峰值  ↑ %s/s   ↓ %s/s", bytesText(peak.tx),
+        title = string.format("Peak  ↑ %s/s   ↓ %s/s", bytesText(peak.tx),
                               bytesText(peak.rx)),
         disabled = true
     }
     if totals then
         items[#items + 1] = {
-            title = string.format("开机以来  ↑ %s   ↓ %s", bytesText(totals.tx),
+            title = string.format("Since boot  ↑ %s   ↓ %s", bytesText(totals.tx),
                                   bytesText(totals.rx)),
             disabled = true
         }
     end
     items[#items + 1] = {
-        title = "清零峰值",
+        title = "Reset peak",
         fn = function() peak = {rx = 0, tx = 0} end
     }
     return items

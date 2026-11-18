@@ -74,7 +74,7 @@ choices go in `init.local.lua`, never in `init.lua`. When adding a module, add i
   error as its tooltip and the rest of the bar keeps running. `render` runs on the main thread,
   so anything waiting on the network or a subprocess belongs in `hs.task` / `hs.http.asyncGet`
   with `ctx.update()` called from its callback. macOS decides where a status item sits;
-  `config.widgets` fixes mount order, not screen order. The host appends one `刷新` item to
+  `config.widgets` fixes mount order, not screen order. The host appends one `Refresh` item to
   every dropdown, which only re-renders — a widget that throttles its own fetching needs its own
   forcing item.
   - `statusbar/battery.lua` — timer-driven example (`interval = 30`), present in `statusbar/`
@@ -124,7 +124,7 @@ choices go in `init.local.lua`, never in `init.lua`. When adding a module, add i
     today alone. `source=starrocks` is a T+1 warehouse whose newest bucket is yesterday.
     `/users/me/budget` also returns `monthly_budget_usd` / `monthly_spend_usd`, but they are not
     maintained for this account (null cap and 0 spend while today was 33 USD, 2026-11-12). The
-    `本月` row therefore appears only with a positive cap and a spend not below today's.
+    `This month` row therefore appears only with a positive cap and a spend not below today's.
     The dropdown breaks the range down by model, by inference key and by provider.
     `by_provider.total_requests` is 0 for every provider while its cost is populated, so the
     provider rows show cost only; `by_model` and `by_key` both carry usable counts.

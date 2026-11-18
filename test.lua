@@ -3,7 +3,7 @@ local T = {}
 
 function T.test()
     -- Print to Hammerspoon console
-    print("\n=== 电池信息 ===")
+    print("\n=== Battery information ===")
 
     local percentage = hs.battery.percentage() or 0
     local isCharging = hs.battery.isCharging()
@@ -18,46 +18,46 @@ function T.test()
     local health = hs.battery.health()
     local healthCondition = hs.battery.healthCondition()
 
-    print(string.format("电量百分比: %d%%", percentage))
-    print(string.format("充电状态: %s",
-                        isCharging and "充电中" or "使用电池"))
-    print(string.format("电源类型: %s", powerSource))
+    print(string.format("Charge: %d%%", percentage))
+    print(string.format("Charging state: %s",
+                        isCharging and "Charging" or "On battery"))
+    print(string.format("Power source: %s", powerSource))
 
     if timeRemaining >= 0 then
-        print(string.format("剩余时间: %d 分钟", timeRemaining))
+        print(string.format("Time remaining: %d min", timeRemaining))
     else
-        print("剩余时间: 计算中...")
+        print("Time remaining: Calculating...")
     end
 
-    print(string.format("电流: %d mA", amperage))
-    print(string.format("电压: %.2f V", voltage / 1000))
-    print(string.format("充电周期: %d 次", cycles))
-    print(string.format("当前容量: %d mAh", capacity))
-    print(string.format("最大容量: %d mAh", maxCapacity))
-    print(string.format("设计容量: %d mAh", designCapacity))
+    print(string.format("Current: %d mA", amperage))
+    print(string.format("Voltage: %.2f V", voltage / 1000))
+    print(string.format("Charge cycles: %d", cycles))
+    print(string.format("Current capacity: %d mAh", capacity))
+    print(string.format("Maximum capacity: %d mAh", maxCapacity))
+    print(string.format("Design capacity: %d mAh", designCapacity))
 
     if type(health) == "number" then
-        print(string.format("电池健康度: %d%%", health))
+        print(string.format("Battery health: %d%%", health))
     elseif health then
-        print(string.format("电池健康度: %s", tostring(health)))
+        print(string.format("Battery health: %s", tostring(health)))
     else
-        print("电池健康度: 不可用")
+        print("Battery health: Unavailable")
     end
 
     if healthCondition then
-        print(string.format("健康状况: %s", tostring(healthCondition)))
+        print(string.format("Health condition: %s", tostring(healthCondition)))
     else
-        print("健康状况: 不可用")
+        print("Health condition: Unavailable")
     end
 
     print("================\n")
 
     -- Show alert with key info
-    local status = isCharging and "充电中" or "使用电池"
+    local status = isCharging and "Charging" or "On battery"
     local healthStr =
         type(health) == "number" and string.format("%d%%", health) or
             tostring(health or "N/A")
-    hs.alert.show(string.format("🔋 %d%% - %s\n电源: %s\n健康度: %s",
+    hs.alert.show(string.format("🔋 %d%% - %s\nPower: %s\nHealth: %s",
                                 percentage, status, powerSource, healthStr))
 end
 

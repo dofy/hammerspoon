@@ -217,11 +217,11 @@ cmd_global() {
            CASE WHEN sw.hits > 0 THEN printf('%.2f', 1.0*sw.top_hits/sw.hits) ELSE '—' END AS focus,
            CASE
              WHEN coalesce(sw.hits,0) >= $MIN_SWITCH_HITS
-                  AND 1.0*sw.top_hits/sw.hits >= $FOCUS_MIN THEN '全局 → ' || sw.target
-             WHEN coalesce(sw.hits,0) >= $MIN_SWITCH_HITS THEN '全局 · 切换类'
-             WHEN tot.apps >= 4 AND coalesce(ent.h,0) / log2(scale.apps) >= 0.6 THEN '疑似全局'
-             WHEN tot.apps = 1 THEN 'app 内'
-             ELSE '不确定'
+                  AND 1.0*sw.top_hits/sw.hits >= $FOCUS_MIN THEN 'Global → ' || sw.target
+             WHEN coalesce(sw.hits,0) >= $MIN_SWITCH_HITS THEN 'Global · switcher'
+             WHEN tot.apps >= 4 AND coalesce(ent.h,0) / log2(scale.apps) >= 0.6 THEN 'Likely global'
+             WHEN tot.apps = 1 THEN 'In-app'
+             ELSE 'Uncertain'
            END AS verdict
     FROM tot
     JOIN ent ON ent.mods = tot.mods AND ent.keycode = tot.keycode
