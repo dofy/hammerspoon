@@ -35,6 +35,7 @@ local modules = ...
 -- modules.keycast.config.types = { shortcuts = true, text = false, special = true, mouse = false }
 -- modules.keycast.config.showModifiers = true -- show held modifier keys
 -- modules.keycast.config.colors = { background = { white = 0.12, alpha = 0.9 }, text = { white = 1, alpha = 1 } }
+-- modules.keycast.config.fontName = "JetBrainsMono Nerd Font" -- falls back to Menlo if unavailable
 -- modules.keycast.config.fontSize = 42
 -- modules.keycast.config.sequenceDelay = 0.5 -- text sequence gap in seconds
 -- modules.keycast.config.linger = 2.0 -- time each line remains visible

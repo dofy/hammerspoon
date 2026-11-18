@@ -15,12 +15,14 @@ M.config = {
     maxRows = 6,
     repeatMode = "normal", -- normal | badge
     maxTextLength = 200, -- maximum Unicode code points kept in memory
+    fontName = "JetBrainsMono Nerd Font",
     fontSize = 42,
     colors = { background = { white = 0, alpha = 0.8 }, text = { white = 1, alpha = 1 } },
 }
 
 local tap, binding, watchdog, animationTimer
 local statusCanvas, statusTimer, statusFadeTimer
+local activeFont
 local active = false
 local modifiersSuppressed = false
 local rows, currentTextRow, lastRepeatRow, modifierRow = {}, nil, nil, nil
@@ -82,6 +84,12 @@ local function displayText(row, text)
     return text .. ((row.repeatCount or 1) > 1 and countBadge(row.repeatCount) or "")
 end
 
+local function resolveFont(preferred)
+    if type(preferred) == "string" and hs.styledtext.validFont(preferred) then return preferred end
+    if hs.styledtext.validFont("Menlo") then return "Menlo" end
+    return ".AppleSystemUIFont"
+end
+
 local function layoutRows()
     local cfg = M.config
     local bounds, screen = windowFrame()
@@ -95,12 +103,12 @@ local function layoutRows()
     for i, row in ipairs(rows) do
         local rawText = row.text
         local text = rawText and displayText(row, rawText)
-        local size = not row.mouseButton and hs.drawing.getTextDrawingSize(text, { size = cfg.fontSize })
+        local size = not row.mouseButton and hs.drawing.getTextDrawingSize(text, { font = activeFont, size = cfg.fontSize })
         local maxWidth = math.max(1, right - left - 24)
         while size and size.w > maxWidth and utf8.len(rawText) and utf8.len(rawText) > 1 do
             rawText = rawText:sub(utf8.offset(rawText, 2))
             text = displayText(row, rawText)
-            size = hs.drawing.getTextDrawingSize(text, { size = cfg.fontSize })
+            size = hs.drawing.getTextDrawingSize(text, { font = activeFont, size = cfg.fontSize })
         end
         local w = math.min(math.max((size and size.w or cfg.fontSize) + 24, 42), right - left)
         local x = cfg.position:find("Right") and right - w - margin or left + margin
@@ -125,7 +133,7 @@ local function layoutRows()
             end
             elements[#elements + 1] = { type = "rectangle", action = "stroke", strokeColor = cfg.colors.text, strokeWidth = 1.5, roundedRectRadii = radii, frame = outline }
         else
-            elements[#elements + 1] = { type = "text", text = text, textColor = cfg.colors.text, textSize = cfg.fontSize,
+            elements[#elements + 1] = { type = "text", text = text, textColor = cfg.colors.text, textFont = activeFont, textSize = cfg.fontSize,
                 textAlignment = "center", frame = { x = 6, y = (h - cfg.fontSize * 1.3) / 2, w = w - 12, h = cfg.fontSize * 1.3 } }
         end
         row.canvas:replaceElements(elements):show()
@@ -371,6 +379,7 @@ function M.stop()
 end
 function M.start()
     M.stop()
+    activeFont = resolveFont(M.config.fontName)
     local types = hs.eventtap.event.types
     tap = hs.eventtap.new({ types.keyDown, types.flagsChanged, types.leftMouseDown, types.rightMouseDown, types.otherMouseDown }, function(event)
         if event:getType() == types.flagsChanged then
